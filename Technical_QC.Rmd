@@ -1,0 +1,361 @@
+---
+title: `r args[1]` 
+author: "G Neilson"
+date: `r format(Sys.time(), '%d %B, %Y')`
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+##Introduction
+This is an R Markdown document for the weeekly Quality Control (QC) check from the Illumina EPIC microarray data from the `r args[1]` 
+
+Samples are not removed after each QC step, but a record is kept of samples which have already failed previous steps and the results of all tests are provided as output.
+
+##Loading data
+```{r loadingdata, include=FALSE}
+library(methylumi)
+library(wateRmelon)
+require(gdata)
+library(minfi)
+library(ggplot2)
+library(gdata)
+require(gridExtra)
+require(IlluminaHumanMethylationEPICmanifest)
+library(tidyr)
+library(dplyr)
+library(IlluminaHumanMethylationEPICanno.ilm10b2.hg19)
+
+setwd("/mnt/data1/Array_Projects/")
+
+SampleSheet <- read.csv("/mnt/data1/Grantneilson/NCBI_QC/SampleSheet_NCBI.csv", stringsAsFactors = FALSE)
+
+SampleSheet<-read.csv(file = args[2], stringsAsFactors = FALSE)
+SampleSheet$Sex <- as.factor(SampleSheet$Sex)
+
+rownames(SampleSheet) <- SampleSheet$test
+
+SampleSheet$Empty <- is.na(SampleSheet$Sample_ID) 
+SampleSheet$Control <- SampleSheet$Sample_ID == "Meth_Control"
+
+
+## make chip name full (R often changes this to scientific notation)
+SampleSheet$Basename2<-SampleSheet$Basename
+SampleSheet<-separate(data = SampleSheet, col = Basename2, into = c("SentrixID", "Position"), sep="_")
+
+
+
+#First copy the idats over to knight using "scp 201114400019/*.idat gShireby@knight.ex.ac.uk:/mnt/data1/BDR/Methylation/idats/" and then use "chmod a+r *.idat" to change the permissions so all users can read the files
+idatPath<-c("/mnt/data1/Array_Projects/Idats")
+
+#For most steps we need the idats as a methylumiSet but for some we need an RGset
+#These take a while to create - so saving as R objects to load faster next time
+# 
+msetEPIC <- readEPIC(idatPath=idatPath, barcodes=pheno$Basename, parallel = FALSE, force=T)
+save(msetEPIC, file= args[3])
+
+
+#load(file = args[3])
+
+
+```
+###Study Information
+**Study:** `r args[1]`
+
+**Description:** Brains for Dementia research. 
+
+**Arrays ran by:** `r print(SampleSheet[1,"Name"])`, The University of Exeter Medical School
+
+**Array used:** Illumina EPIC microarray v1.0
+
+**QC done by:**Grant Neilson, The University of Exeter Medical School
+
+**Date of QC:** `r format(Sys.Date(), format="%d %B %Y")`
+
+**Sample ages:** `r range(SampleSheet$Age)`
+
+**Sample tissue:** Brain - occipital lobe and prefrontal cortex 
+
+##QC Information 
+
+
+```{r createQCmetrics, echo=FALSE}
+betas <- betas(msetEPIC)
+SampleSheet <- SampleSheet[order(rownames(SampleSheet)),]
+msetEPIC <- msetEPIC[,order(colnames(msetEPIC))]
+if(print(identical(rownames(SampleSheet), colnames(msetEPIC))) ==TRUE){
+  print("mSET and pheno samples match")
+} else{
+  print("mSET and pheno samples do not match")
+  exit()
+}
+
+
+#QC metrics can be be bound on to the end of a copy of the sample sheet 
+
+QCmetrics<-SampleSheet
+
+#SamplesFail will be our boolean record of which samples have already failed
+SamplesFail<-as.logical(rep("FALSE", nrow(SampleSheet)))
+#Entries will be changed to TRUE as samples fail 
+
+Stepsummary<-as.data.frame(matrix(ncol=0, nrow=2))
+rownames(Stepsummary)<-c("Failed This Step", "Total Failed")
+```
+
+The phenotype file containing the sample information was loaded into R. Then the methylation data for the `r nrow(SampleSheet)` samples were loaded into a methylumiset. This contains `r nrow(SampleSheet[pheno$Sample_ID != "Meth_control",])` `r args[1]` and `r nrow(SampleSheet[pheno$Sample_ID == "Meth_control",])` fully methylated control samples.
+
+##Check Signal Intensities
+The intensity check is the biggest indicator of sample quality. The median methylated signal intensity and unmethylated signal intensity for each sample is calculcated.
+
+```{r medianintensities, include=FALSE}
+m_intensities<-methylated(msetEPIC)
+u_intensities<-unmethylated(msetEPIC)
+M.median<-apply(m_intensities, 2, median)
+U.median<-apply(u_intensities, 2, median)
+QCmetrics<-cbind(SampleSheet,M.median, U.median)
+```
+
+A histogram and scatter plot of the resulting data are plotted to visualise the data quality. Samples are coloured by methylation plate or institute, to make sure there are no batch effects.
+
+```{r plotintensities, echo=FALSE}
+
+# coloured by institute
+if(!is.na(SampleSheet[1,"Institute"])){
+plotfactor<-factor(SampleSheet$Institute, levels=c(unique(SampleSheet$Institute))) 
+par(mfrow = c(1,2))
+hist(M.median, xlab = "Median M intensity", main="Histogram of Median Methylated Intensities", cex.main=0.7)
+hist(U.median, xlab = "Median U intensity", main="Histogram of Median Unmethylated Intensities", cex.main=0.7)
+par(mfrow = c(1,1))
+plot(M.median, U.median, pch = 16, xlab = "Median M intensity", ylab = "Median U intensity", col = rainbow(nlevels(plotfactor))[factor(plotfactor)], main="Scatter plot of Signal Intensities coloured by Institue")
+par(xpd=TRUE)
+legend("topright", levels(factor(plotfactor)), col = rainbow(nlevels(plotfactor)), pch = 10, cex=0.5)
+}
+
+#coloured by plate
+if(!is.na(SampleSheet[1,"Plate"])){
+plotfactor<-factor(SampleSheet$Plate, levels=c(unique(SampleSheet$Plate)))
+par(mfrow = c(1,2))
+hist(M.median, xlab = "Median M intensity", main="Histogram of Median Methylated Intensities", cex.main=0.7)
+hist(U.median, xlab = "Median U intensity", main="Histogram of Median Unmethylated Intensities", cex.main=0.7)
+par(mfrow = c(1,1))
+plot(M.median, U.median, pch = 16, xlab = "Median M intensity", ylab = "Median U intensity", col = rainbow(nlevels(plotfactor))[factor(plotfactor)], main="Scatter plot of Signal Intensities coloured by plate")
+par(xpd=TRUE)
+legend("topright", levels(factor(plotfactor)), col = rainbow(nlevels(plotfactor)), pch = 10, cex=0.5)
+}
+
+##Coloured by Cell type
+if(!is.na(SampleSheet[1,"Cell_Type"])){
+plotfactor<-factor(SampleSheet$Cell_Type, levels=c(unique(SampleSheet$Cell_Type)))
+par(mfrow = c(1,2))
+hist(M.median, xlab = "Median M intensity", main="Histogram of Median Methylated Intensities", cex.main=0.7)
+hist(U.median, xlab = "Median U intensity", main="Histogram of Median Unmethylated Intensities", cex.main=0.7)
+par(mfrow = c(1,1))
+plot(M.median, U.median, pch = 16, xlab = "Median M intensity", ylab = "Median U intensity", col = rainbow(nlevels(plotfactor))[factor(plotfactor)], main="Scatter plot of Signal Intensities coloured by Cell Type")
+par(xpd=TRUE)
+legend("topright", levels(factor(plotfactor)), col = rainbow(nlevels(plotfactor)), pch = 10, cex=0.5)
+}
+
+## Coloured By Race
+if(!is.na(SampleSheet[1,"Race"])){
+plotfactor<-factor(SampleSheet$Race, levels=c(unique(SampleSheet$Race)))
+par(mfrow = c(1,2))
+hist(M.median, xlab = "Median M intensity", main="Histogram of Median Methylated Intensities", cex.main=0.7)
+hist(U.median, xlab = "Median U intensity", main="Histogram of Median Unmethylated Intensities", cex.main=0.7)
+par(mfrow = c(1,1))
+plot(M.median, U.median, pch = 16, xlab = "Median M intensity", ylab = "Median U intensity", col = rainbow(nlevels(plotfactor))[factor(plotfactor)], main="Scatter plot of Signal Intensities coloured by Race")
+par(xpd=TRUE)
+legend("topright", levels(factor(plotfactor)), col = rainbow(nlevels(plotfactor)), pch = 10, cex=0.5)
+}
+
+##Colourefd by Tisssue type
+if(!is.na(SampleSheet[1,"Tissue_Type"])){
+plotfactor<-factor(SampleSheet$Tissue_Type, levels=c(unique(SampleSheet$Tissue_Type)))
+par(mfrow = c(1,2))
+hist(M.median, xlab = "Median M intensity", main="Histogram of Median Methylated Intensities", cex.main=0.7)
+hist(U.median, xlab = "Median U intensity", main="Histogram of Median Unmethylated Intensities", cex.main=0.7)
+par(mfrow = c(1,1))
+plot(M.median, U.median, pch = 16, xlab = "Median M intensity", ylab = "Median U intensity", col = rainbow(nlevels(plotfactor))[factor(plotfactor)], main="Scatter plot of Signal Intensities coloured by Tissue Type")
+par(xpd=TRUE)
+legend("topright", levels(factor(plotfactor)), col = rainbow(nlevels(plotfactor)), pch = 10, cex=0.5)
+}
+
+##Coloured by Organ
+if(!is.na(SampleSheet[1,"Organ"])){
+plotfactor<-factor(SampleSheet$Organ, levels=c(unique(SampleSheet$Organ)))
+par(mfrow = c(1,2))
+hist(M.median, xlab = "Median M intensity", main="Histogram of Median Methylated Intensities", cex.main=0.7)
+hist(U.median, xlab = "Median U intensity", main="Histogram of Median Unmethylated Intensities", cex.main=0.7)
+par(mfrow = c(1,1))
+plot(M.median, U.median, pch = 16, xlab = "Median M intensity", ylab = "Median U intensity", col = rainbow(nlevels(plotfactor))[factor(plotfactor)], main="Scatter plot of Signal Intensities coloured by Organ")
+par(xpd=TRUE)
+legend("topright", levels(factor(plotfactor)), col = rainbow(nlevels(plotfactor)), pch = 10, cex=0.5)
+}
+
+##Coloured by SentrixID
+if(!is.na(SampleSheet[1,"SentrixID"])){
+plotfactor<-factor(SampleSheet$SentrixID, levels=c(unique(SampleSheet$SentrixID)))
+par(mfrow = c(1,2))
+hist(M.median, xlab = "Median M intensity", main="Histogram of Median Methylated Intensities", cex.main=0.7)
+hist(U.median, xlab = "Median U intensity", main="Histogram of Median Unmethylated Intensities", cex.main=0.7)
+par(mfrow = c(1,1))
+plot(M.median, U.median, pch = 16, xlab = "Median M intensity", ylab = "Median U intensity", col = rainbow(nlevels(plotfactor))[factor(plotfactor)], main="Scatter plot of Signal Intensities coloured by SentrixID")
+par(xpd=TRUE)
+legend("topright", levels(factor(plotfactor)), col = rainbow(nlevels(plotfactor)), pch = 10, cex=0.5)
+}
+
+
+```
+
+
+The signal intensities are okay for these samples. 
+ 
+To further investigate the plates we can plot heatmaps of the intensities, shown below.
+
+```{r intensityheatmap, echo=FALSE}
+QCmetrics$position<-factor(QCmetrics$Position)
+QCmetrics$SentrixID<-factor(QCmetrics$SentrixID, levels=rev(unique(QCmetrics$SentrixID))) #keeps the levels of the factor in current order rather than sorting numerically/alphabetically, also reverses this order as heatmaps plot bottom to top
+
+plates<-unique(QCmetrics$Plate)
+
+
+#extract the legend (using a function found online)
+g_legend<-function(a.gplot){
+    tmp <- ggplot_gtable(ggplot_build(a.gplot))
+    leg <- which(sapply(tmp$grobs, function(x) x$name) == "guide-box")
+    legend <- tmp$grobs[[leg]]
+    legend
+}
+
+for(plate in plates){
+  samples<-QCmetrics[which(QCmetrics$Plate == plate),]
+  control<-samples[samples$Control,]
+
+  plateHeatmap <- ggplot(data=samples, aes(x=Position, y=SentrixID)) +
+    scale_fill_gradientn(colours=colorRamps::matlab.like(100), limits=c(min(QCmetrics$U.median),max(QCmetrics$M.median))) +
+    labs(x="", y="") +
+    theme_minimal() + 
+    coord_equal() +
+    theme(plot.title = element_text(hjust = 0.5), axis.text.x = element_text(angle = 90, hjust=1))
+  
+  plot1 <- plateHeatmap +
+    ggtitle("Median Methylated Intensity") +
+    geom_tile(aes(fill=M.median), colour = "white") +
+    geom_point(data=control, aes(x=control$Position, y=control$SentrixID)) +
+    theme(legend.position = "none")
+  
+  plot2 <- plateHeatmap +
+    ggtitle("Median Unmethylated Intensity") +
+    geom_tile(aes(fill=U.median), colour = "white") +
+    geom_point(data=control, aes(x=control$Position, y=control$SentrixID)) +
+    theme(legend.position = "none")
+  
+  legendplot<-plateHeatmap + 
+    geom_tile(aes(fill=U.median), colour = "white") +
+    labs(fill="Intensity", alpha="Control") +
+    geom_point(data=control, aes(x=control$Position, y=control$SentrixID, alpha=control$Control)) +
+    scale_alpha_manual(values=c(1,1,1)) + 
+    guides(alpha = guide_legend(override.aes = list(colour="black", pch=16)))
+    
+  legend<-g_legend(legendplot)
+  
+  grid.arrange(plot1, plot2, legend, ncol=3, widths=c(3/7, 3/7, 1/7), top=paste("", plate))
+}
+```
+
+
+
+The fully methylated controls have their intensities logged, and saved to FullyMethylatedControlSamples.csv for cross-study comparisions of the scanner.
+
+```{r removecontrols, include=FALSE}
+Previous_FMpheno <- read.csv("/mnt/data1/Array_Projects/Methylated_Controls/AllFullyMethylatedControlSamples.csv")
+FMpheno<-QCmetrics[SampleSheet$Control,c("Basename", "SentrixID", "Position", "M.median", "U.median")]
+# 
+# #we also want to manually find the time they were processed (this is the time stamp of the idats on the MDrive)
+# times<-data.frame(Date_Ran=c("06/12/2018","06/12/2018","21/12/2018","22/12/2018","20/03/2019","25/03/2019","20/03/2019","25/03/2019","19/07/2019","23/07/2019","02/08/2019","05/08/2019","30/10/2019","01/11/2019")
+# add some study info and save
+info<-data.frame(Study=rep(args[1],nrow(FMpheno)), iDAT_Location=rep(idatPath, nrow(FMpheno)))
+FMpheno<-cbind(info, times, FMpheno)
+FMpheno <- rbind(Previous_FMpheno, FMpheno)
+ write.csv(FMpheno, "/mnt/data1/Array_Projects/Methylated_Controls/AllFullyMethylatedControlSamples.csv", row.names=FALSE)
+
+
+#remove from all variables
+M.median<-M.median[!SampleSheet$Control]
+U.median<-U.median[!SampleSheet$Control]
+msetEPIC<-msetEPIC[,!SampleSheet$Control]
+
+SamplesFail<-SamplesFail[!SampleSheet$Control]
+QCmetrics<-QCmetrics[!SampleSheet$Control,]
+SampleSheet<-SampleSheet[!SampleSheet$Control,]
+
+
+## remove the empty 'samples'
+M.median<-M.median[!SampleSheet$Empty]
+U.median<-U.median[!SampleSheet$Empty]
+msetEPIC<-msetEPIC[,!SampleSheet$Empty]
+SamplesFail<-SamplesFail[!SampleSheet$Empty]
+QCmetrics<-QCmetrics[!SampleSheet$Empty,]
+SampleSheet<-SampleSheet[!SampleSheet$Empty,]
+
+```
+
+Although signal intensity is the largest predictor of sample quality, the threshold at which to exclude samples can vary from experiment to experiment - for example, signal intensities can vary slightly depending on tissue type or DNA extraction method. Samples which clearly deviate from the main cluster on the signal intensity plots should be removed. 
+These samples had lower signal intensities than usual
+
+```{r}
+
+lowintensitysamples<-which(M.median < 100 | U.median < 100)
+```
+
+```{r scatter500, echo=FALSE}
+Intensity<-rep("OK", nrow(SampleSheet))
+Intensity[lowintensitysamples] <-"LowIntensity"
+
+plotfactor<-as.factor(Intensity)
+
+plot(M.median, U.median, pch = 16, xlab = "Median M intensity", ylab = "Median U intensity", col=rainbow(2)[factor(plotfactor)])
+abline(v = 1000, col = "red")
+abline(h = 1000, col = "red")
+legend("topleft", levels(factor(plotfactor)), pch = 16, col = rainbow(2))
+```
+
+
+```{r updateQCmetrics1, include=FALSE}
+SamplesFail[which(Intensity=="LowIntensity")]<-TRUE
+QCmetrics<-cbind(QCmetrics, Intensity)
+Step1<-c(sum(Intensity=="LowIntensity"),sum(SamplesFail))
+Stepsummary<-cbind(Stepsummary,Step1)
+```
+
+
+```{r Stepsummary1}
+print(Stepsummary)
+```
+
+##Bisulphite Conversion
+A bisulphite conversion statistic for each sample was calculated, and a histogram of the results plotted.
+
+```{r bisulphiteconversion, echo=FALSE}
+Bisulphite<-bscon(msetEPIC)
+hist(Bisulphite, xlab = "Median % BS conversion", main = "Histogram of Bisulphite Converstion Statistics")
+```
+
+This shows the conversion statistics were generally high. Samples with a conversion < 80% fail the QC, so with this threshold `r sum(Bisulphite<80)` samples fail the QC, and will be removed at a later stage.
+
+
+```{r updateQCmetrics2, include=FALSE}
+QCmetrics<-cbind(QCmetrics, Bisulphite)
+SamplesFail[which(Bisulphite<80)]<-TRUE
+Step2<-c(sum(Bisulphite<80, na.rm=T),sum(SamplesFail))
+Stepsummary<-cbind(Stepsummary,Step2)
+
+
+bisulphite_fail <- QCmetrics[SamplesFail,]
+```
+
+```{r Stepsummary2}
+print(Stepsummary)
+```
