@@ -31,6 +31,8 @@ library(IlluminaHumanMethylationEPICanno.ilm10b2.hg19)
 setwd("/mnt/data1/Array_Projects/")
 
 SampleSheet <- read.csv("/mnt/data1/Grantneilson/NCBI_QC/SampleSheet_NCBI.csv", stringsAsFactors = FALSE)
+load("/mnt/data1/Grantneilson/NCBI_QC/NCBI_Mset.rdat")
+load("/mnt/data1/Grantneilson/NCBI_QC/NCBI_RGset.rdat")
 
 SampleSheet<-read.csv(file = args[2], stringsAsFactors = FALSE)
 SampleSheet$Sex <- as.factor(SampleSheet$Sex)
@@ -57,6 +59,11 @@ msetEPIC <- readEPIC(idatPath=idatPath, barcodes=pheno$Basename, parallel = FALS
 save(msetEPIC, file= args[3])
 
 
+RGset <- read.metharray.exp(base = idatPath, targets = pheno, force = TRUE)
+save(RGset, file=args[4])
+
+
+#load(file= agrs[4])
 #load(file = args[3])
 
 
@@ -358,4 +365,11 @@ bisulphite_fail <- QCmetrics[SamplesFail,]
 
 ```{r Stepsummary2}
 print(Stepsummary)
+```
+
+
+```{r Control_Probe_analysis, echo=FALSE}
+
+controlStripPlot(RGset, controls="BISULFITE CONVERSION II")
+
 ```
