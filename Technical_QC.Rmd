@@ -1,16 +1,22 @@
 ---
-title: `r args[1]` 
+title: "Technical QC" 
 author: "G Neilson"
-date: `r format(Sys.time(), '%d %B, %Y')`
 output: html_document
+params: 
+  Name: NCBI_test
+  SampleSheet: SampleSheet_NCBI.csv
+  Mset: NCBI_Mset.rdat 
+  RGset: NCBI_RGset.rdat
 ---
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
+
+
 ##Introduction
-This is an R Markdown document for the weeekly Quality Control (QC) check from the Illumina EPIC microarray data from the `r args[1]` 
+This is an R Markdown document for the weeekly Quality Control (QC) check from the Illumina EPIC microarray data from the `r params$Name` 
 
 Samples are not removed after each QC step, but a record is kept of samples which have already failed previous steps and the results of all tests are provided as output.
 
@@ -30,11 +36,7 @@ library(IlluminaHumanMethylationEPICanno.ilm10b2.hg19)
 
 setwd("/mnt/data1/Array_Projects/")
 
-SampleSheet <- read.csv("/mnt/data1/Grantneilson/NCBI_QC/SampleSheet_NCBI.csv", stringsAsFactors = FALSE)
-load("/mnt/data1/Grantneilson/NCBI_QC/NCBI_Mset.rdat")
-load("/mnt/data1/Grantneilson/NCBI_QC/NCBI_RGset.rdat")
-
-SampleSheet<-read.csv(file = args[2], stringsAsFactors = FALSE)
+SampleSheet<-read.csv(file = params$SampleSheet, stringsAsFactors = FALSE)
 SampleSheet$Sex <- as.factor(SampleSheet$Sex)
 
 rownames(SampleSheet) <- SampleSheet$test
@@ -55,21 +57,21 @@ idatPath<-c("/mnt/data1/Array_Projects/Idats")
 #For most steps we need the idats as a methylumiSet but for some we need an RGset
 #These take a while to create - so saving as R objects to load faster next time
 # 
-msetEPIC <- readEPIC(idatPath=idatPath, barcodes=pheno$Basename, parallel = FALSE, force=T)
-save(msetEPIC, file= args[3])
+# msetEPIC <- readEPIC(idatPath=idatPath, barcodes=pheno$Basename, parallel = FALSE, force=T)
+# save(msetEPIC, params$Mset)
+# 
+# 
+# RGset <- read.metharray.exp(base = idatPath, targets = pheno, force = TRUE)
+# save(RGset,params$RGset)
 
 
-RGset <- read.metharray.exp(base = idatPath, targets = pheno, force = TRUE)
-save(RGset, file=args[4])
-
-
-#load(file= agrs[4])
-#load(file = args[3])
+load(file= params$RGset)
+load(file = params$Mset)
 
 
 ```
 ###Study Information
-**Study:** `r args[1]`
+**Study:** `r params$Name`
 
 **Description:** Brains for Dementia research. 
 
@@ -112,7 +114,7 @@ Stepsummary<-as.data.frame(matrix(ncol=0, nrow=2))
 rownames(Stepsummary)<-c("Failed This Step", "Total Failed")
 ```
 
-The phenotype file containing the sample information was loaded into R. Then the methylation data for the `r nrow(SampleSheet)` samples were loaded into a methylumiset. This contains `r nrow(SampleSheet[pheno$Sample_ID != "Meth_control",])` `r args[1]` and `r nrow(SampleSheet[pheno$Sample_ID == "Meth_control",])` fully methylated control samples.
+The phenotype file containing the sample information was loaded into R. Then the methylation data for the `r nrow(SampleSheet)` samples were loaded into a methylumiset. This contains `r nrow(SampleSheet[SampleSheet$Sample_ID != "Meth_control",])` `r params$Name` and `r nrow(SampleSheet[SampleSheet$Sample_ID == "Meth_control",])` fully methylated control samples.
 
 ##Check Signal Intensities
 The intensity check is the biggest indicator of sample quality. The median methylated signal intensity and unmethylated signal intensity for each sample is calculcated.
@@ -213,7 +215,6 @@ par(xpd=TRUE)
 legend("topright", levels(factor(plotfactor)), col = rainbow(nlevels(plotfactor)), pch = 10, cex=0.5)
 }
 
-
 ```
 
 
@@ -279,11 +280,16 @@ The fully methylated controls have their intensities logged, and saved to FullyM
 ```{r removecontrols, include=FALSE}
 Previous_FMpheno <- read.csv("/mnt/data1/Array_Projects/Methylated_Controls/AllFullyMethylatedControlSamples.csv")
 FMpheno<-QCmetrics[SampleSheet$Control,c("Basename", "SentrixID", "Position", "M.median", "U.median")]
+Betas_meth_control <- betas[,SampleSheet$Control]
+
 # 
 # #we also want to manually find the time they were processed (this is the time stamp of the idats on the MDrive)
-# times<-data.frame(Date_Ran=c("06/12/2018","06/12/2018","21/12/2018","22/12/2018","20/03/2019","25/03/2019","20/03/2019","25/03/2019","19/07/2019","23/07/2019","02/08/2019","05/08/2019","30/10/2019","01/11/2019")
+meth_controls <- SampleSheet[SampleSheet$Control, c("Basename")]
+
+
+ times<-data.frame(Date_Ran=rep(Sys.Date(),length(meth_controls)))
 # add some study info and save
-info<-data.frame(Study=rep(args[1],nrow(FMpheno)), iDAT_Location=rep(idatPath, nrow(FMpheno)))
+info<-data.frame(Study=rep(params$Name,nrow(FMpheno)), iDAT_Location=rep(idatPath, nrow(FMpheno)))
 FMpheno<-cbind(info, times, FMpheno)
 FMpheno <- rbind(Previous_FMpheno, FMpheno)
  write.csv(FMpheno, "/mnt/data1/Array_Projects/Methylated_Controls/AllFullyMethylatedControlSamples.csv", row.names=FALSE)
@@ -368,8 +374,17 @@ print(Stepsummary)
 ```
 
 
-```{r Control_Probe_analysis, echo=FALSE}
+```{r Array statistics}
 
-controlStripPlot(RGset, controls="BISULFITE CONVERSION II")
+# 
+# Chip_ID <- unique(SampleSheet$SentrixID)
+# meth_controls_betas <- betas[,SampleSheet$Control]
+# mean_betas <- matrix(data = NA, ncol = 1, nrow = ncol(meth_controls_betas))
+# rownames(mean_betas)<-colnames(meth_controls_betas)
+# colnames(mean_betas) <-c("Mean_beta_value")
+# for(i in 1:ncol(meth_controls_betas)){
+#   tmp <- meth_controls_betas[,i]
+#   mean_betas[i,1] <- median(tmp, na.rm =TRUE)
+# }
 
 ```
