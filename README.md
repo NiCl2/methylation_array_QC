@@ -1,12 +1,11 @@
 # Epic_methylation_array_QC
 
 
-When submitting the command line needs args which are files it will laod into the script 
+When submitting the sample sheet check needs to have arguments submitted along side, the argument is the "SampleSheet_Name.csv"
 
-in the sample sheet test script the arg ois the sample sheet name
+The Rmd both have parameters that need to be added in the shell script
+look at which paramters need to be added in the YAML sectio nat the top of the Rmd document
 
-in the technical QC
-args1 = project name
-args2 = "sample sheet name".csv
-args3 = "projectName"_Mset.rdat
-args4 = "projectName"_RGset.rdat
+to submitt the Rmd run this code in the shell
+
+Rscript -e 'library(rmarkdown);rmarkdown::render("Name_of_Rmd.Rmd", params = list(Name = "Bipolar Study", SampleSheet = "SampleSheet_NCBI.csv", Mset = "NCBI_Mset.rdat", RGset = "NCBI_RGset.rdat"))'
