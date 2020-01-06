@@ -3,10 +3,10 @@ title: "Technical QC"
 author: "G Neilson"
 output: html_document
 params: 
-  Name: NCBI_test
-  SampleSheet: SampleSheet_NCBI.csv
-  Mset: NCBI_Mset.rdat 
-  RGset: NCBI_RGset.rdat
+  Name: Study_Name
+  SampleSheet: SampleSheet_Name.csv
+  Mset: Mset_Name.rdat
+  RGset: RGset_Name.rdat
 ---
 
 ```{r setup, include=FALSE}
@@ -85,7 +85,7 @@ load(file = params$Mset)
 
 **Sample ages:** `r range(SampleSheet$Age)`
 
-**Sample tissue:** Brain - occipital lobe and prefrontal cortex 
+**Sample tissue:** `r if(!is.na(SampleSheet[1,"Organ"])){print(SampleSheet[1,"Organ"])}` - `r print(unique(SampleSheet$Tissue_Type))` 
 
 ##QC Information 
 
@@ -95,9 +95,9 @@ betas <- betas(msetEPIC)
 SampleSheet <- SampleSheet[order(rownames(SampleSheet)),]
 msetEPIC <- msetEPIC[,order(colnames(msetEPIC))]
 if(print(identical(rownames(SampleSheet), colnames(msetEPIC))) ==TRUE){
-  print("mSET and pheno samples match")
+  print("Mset and Sample sheet  match")
 } else{
-  print("mSET and pheno samples do not match")
+  print("Mset and Sample Sheet do not match")
   exit()
 }
 
@@ -286,7 +286,6 @@ Betas_meth_control <- betas[,SampleSheet$Control]
 # #we also want to manually find the time they were processed (this is the time stamp of the idats on the MDrive)
 meth_controls <- SampleSheet[SampleSheet$Control, c("Basename")]
 
-
  times<-data.frame(Date_Ran=rep(Sys.Date(),length(meth_controls)))
 # add some study info and save
 info<-data.frame(Study=rep(params$Name,nrow(FMpheno)), iDAT_Location=rep(idatPath, nrow(FMpheno)))
@@ -299,7 +298,7 @@ FMpheno <- rbind(Previous_FMpheno, FMpheno)
 M.median<-M.median[!SampleSheet$Control]
 U.median<-U.median[!SampleSheet$Control]
 msetEPIC<-msetEPIC[,!SampleSheet$Control]
-
+RGset<-RGset[,!SampleSheet$Control]
 SamplesFail<-SamplesFail[!SampleSheet$Control]
 QCmetrics<-QCmetrics[!SampleSheet$Control,]
 SampleSheet<-SampleSheet[!SampleSheet$Control,]
@@ -309,6 +308,7 @@ SampleSheet<-SampleSheet[!SampleSheet$Control,]
 M.median<-M.median[!SampleSheet$Empty]
 U.median<-U.median[!SampleSheet$Empty]
 msetEPIC<-msetEPIC[,!SampleSheet$Empty]
+RGset<-RGset[,!SampleSheet$Empty]
 SamplesFail<-SamplesFail[!SampleSheet$Empty]
 QCmetrics<-QCmetrics[!SampleSheet$Empty,]
 SampleSheet<-SampleSheet[!SampleSheet$Empty,]
@@ -320,7 +320,7 @@ These samples had lower signal intensities than usual
 
 ```{r}
 
-lowintensitysamples<-which(M.median < 100 | U.median < 100)
+lowintensitysamples<-which(M.median < 1000 | U.median < 1000)
 ```
 
 ```{r scatter500, echo=FALSE}
