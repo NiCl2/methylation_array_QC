@@ -14,20 +14,31 @@ Rscript -e 'library(rmarkdown);rmarkdown::render("Name_of_Rmd.Rmd", params = lis
 Technical QC has 4 parameters 
 
 Name: Study_Name
-  SampleSheet: SampleSheet_Name.csv
-  Mset: Mset_Name.rdat
-  RGset: RGset_Name.rdat
+
+SampleSheet: SampleSheet_Name.csv
+
+Mset: Mset_Name.rdat
+
+RGset: RGset_Name.rdat
   
   # Full QC
   Full QC has 9 
   Name: Name_Of_Study
+  
   SampleSheet: SampleSheet.csv
+  
   Mset: Mset_Name.rdat 
+  
   RGset: RGset_Name.rdat
+  
   IntensityThreshold: 1000
+  
   Genotype: GenotypeTable.csv
+  
   SamplesPassed: SamplesPassedQC.csv
+  
   SamplesFailed: SamplesFailedQC.csv
+  
   Normalised: Samples_Normalised.rdat
   
   intensity threshold has a default of a 1000 so if it is not specified in params it will be set to that
