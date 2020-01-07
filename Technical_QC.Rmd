@@ -4,7 +4,7 @@ author: "G Neilson"
 output: html_document
 params: 
   Name: Study_Name
-  SampleSheet: SampleSheet_Name.csv
+  SampleSheet: SampleSheet_NCBI.csv
   Mset: Mset_Name.rdat
   RGset: RGset_Name.rdat
 ---
@@ -48,28 +48,35 @@ SampleSheet$Control <- SampleSheet$Sample_ID == "Meth_Control"
 ## make chip name full (R often changes this to scientific notation)
 SampleSheet$Basename2<-SampleSheet$Basename
 SampleSheet<-separate(data = SampleSheet, col = Basename2, into = c("SentrixID", "Position"), sep="_")
+```
 
-
-
-#First copy the idats over to knight using "scp 201114400019/*.idat gShireby@knight.ex.ac.uk:/mnt/data1/BDR/Methylation/idats/" and then use "chmod a+r *.idat" to change the permissions so all users can read the files
+```{r Making Mset and RGset, echo=FALSE}
+setwd("/mnt/data1/Array_Projects/")
+#First copy the idats over to knight using "scp 201114400019/*.idat gNeilson@knight.ex.ac.uk:/mnt/data1/BDR/Methylation/idats/" and then use "chmod a+r *.idat" to change the permissions so all users can read the files
 idatPath<-c("/mnt/data1/Array_Projects/Idats")
 
 #For most steps we need the idats as a methylumiSet but for some we need an RGset
 #These take a while to create - so saving as R objects to load faster next time
-# 
-# msetEPIC <- readEPIC(idatPath=idatPath, barcodes=pheno$Basename, parallel = FALSE, force=T)
-# save(msetEPIC, params$Mset)
-# 
-# 
-# RGset <- read.metharray.exp(base = idatPath, targets = pheno, force = TRUE)
-# save(RGset,params$RGset)
 
+if(file.exists(file=  params$Mset)){
+  load(file = params$Mset)
+  print(paste("Loading Mset:", params$Mset))
+} else {
+msetEPIC <- readEPIC(idatPath=idatPath, barcodes=SampleSheet$Basename, parallel = FALSE, force=T)
+save(msetEPIC, params$Mset)
+print(paste("Mset created and saved as", params$Mset))
+}
 
-load(file= params$RGset)
-load(file = params$Mset)
-
-
+if(file.exists(file= params$RGset)){
+  load(file= params$RGset)
+  print(paste("Loading RGset:", params$RGset))
+} else{
+RGset <- read.metharray.exp(base = idatPath, targets = SampleSheet, force = TRUE)
+save(RGset,params$RGset)
+print(paste("RGset created and saved as", params$RGset))
+}
 ```
+
 ###Study Information
 **Study:** `r params$Name`
 
@@ -85,7 +92,9 @@ load(file = params$Mset)
 
 **Sample ages:** `r range(SampleSheet$Age)`
 
-**Sample tissue:** `r if(!is.na(SampleSheet[1,"Organ"])){print(SampleSheet[1,"Organ"])}` - `r print(unique(SampleSheet$Tissue_Type))` 
+**Sample Organ:** `r if(!is.na(SampleSheet[1,"Organ"])){print(SampleSheet[1,"Organ"])}` 
+
+**Sample Tissue:** `r paste(unique(SampleSheet$Tissue_Type))` 
 
 ##QC Information 
 
@@ -103,7 +112,6 @@ if(print(identical(rownames(SampleSheet), colnames(msetEPIC))) ==TRUE){
 
 
 #QC metrics can be be bound on to the end of a copy of the sample sheet 
-
 QCmetrics<-SampleSheet
 
 #SamplesFail will be our boolean record of which samples have already failed

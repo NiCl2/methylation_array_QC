@@ -3,11 +3,12 @@ title: "Full Epic Array Quality Control"
 author: "G Neilson"
 output: html_document
 params: 
-  Name: Name_OF_Study
+  Name: Name_Of_Study
   SampleSheet: SampleSheet.csv
   Mset: Mset_Name.rdat 
   RGset: RGset_Name.rdat
-  Genotype: GenotypeTable
+  IntensityThreshold: 1000
+  Genotype: GenotypeTable.csv
   SamplesPassed: SamplesPassedQC.csv
   SamplesFailed: SamplesFailedQC.csv
   Normalised: Samples_Normalised.rdat
@@ -61,17 +62,23 @@ idatPath<-c("/mnt/data1/Array_Projects/Idats")
 
 #For most steps we need the idats as a methylumiSet but for some we need an RGset
 #These take a while to create - so saving as R objects to load faster next time
-# 
-# msetEPIC <- readEPIC(idatPath=idatPath, barcodes=SampleSheet$Basename, parallel = FALSE, force=T)
-# save(msetEPIC, params$Mset)
-# 
-# 
-# RGset <- read.metharray.exp(base = idatPath, targets = SampleSheet, force = TRUE)
-# save(RGset,params$RGset)
 
+if(file.exists(file= paste("/mnt/data1/Array_Projects", params$Mset, sep = "/"))){
+  load(file = paste("/mnt/data1/Array_Projects", params$Mset, sep = "/"))
+  print(paste("Loading Mset:", params$Mset))
+} else {
+msetEPIC <- readEPIC(idatPath=idatPath, barcodes=SampleSheet$Basename, parallel = FALSE, force=T)
+save(msetEPIC, params$Mset)
+}
 
-load(file= params$RGset)
-load(file = params$Mset)
+if(file.exists(file= paste("/mnt/data1/Array_Projects", params$RGset, sep = "/"))){
+  load(file= paste("/mnt/data1/Array_Projects", params$RGset, sep = "/"))
+  print(paste("Loading RGset:", params$RGset))
+} else{
+RGset <- read.metharray.exp(base = idatPath, targets = SampleSheet, force = TRUE)
+save(RGset,params$RGset)
+}
+```
 
 ```
 
@@ -84,13 +91,15 @@ load(file = params$Mset)
 
 **Array used:** Illumina EPIC microarray v1.0
 
-**QC done by:**Aisha Dahir and Grant Neilson, The University of Exeter Medical School
+**QC done by:**Grant Neilson, The University of Exeter Medical School
 
 **Date of QC:** `r format(Sys.Date(), format="%d %B %Y")`
 
 **Sample ages:** `r range(SampleSheet$Age)`
 
-**Sample tissue:** `r print(SampleSheet[1,"Organ")` - ` r print(unique(SampleSheet$Tissue_Type))` 
+**Sample Organ:** `r if(!is.na(SampleSheet[1,"Organ"])){print(SampleSheet[1,"Organ"])}` 
+
+**Sample Tissue:** `r print(unique(SampleSheet$Tissue_Type))` 
 
 ##QC Information 
 
@@ -309,7 +318,7 @@ These samples had lower signal intensities than usual
 
 ```{r}
 
-lowintensitysamples<-which(M.median < 1000 | U.median < 1000)
+lowintensitysamples<-which(M.median < params$IntensityThreshold | U.median < params$IntensityThreshold)
 ```
 
 ```{r scatter500, echo=FALSE}
@@ -319,8 +328,8 @@ Intensity[lowintensitysamples] <-"LowIntensity"
 plotfactor<-as.factor(Intensity)
 
 plot(M.median, U.median, pch = 16, xlab = "Median M intensity", ylab = "Median U intensity", col=rainbow(2)[factor(plotfactor)])
-abline(v = 1000, col = "red")
-abline(h = 1000, col = "red")
+abline(v = params$IntensityThreshold, col = "red")
+abline(h = params$IntensityThreshold, col = "red")
 legend("topleft", levels(factor(plotfactor)), pch = 16, col = rainbow(2))
 ```
 

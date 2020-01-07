@@ -21,7 +21,7 @@ for (i in 1:length(Sample_IDtest)){
 
 for(i in 1:nrow(SampleSheet)){
   if(SampleSheet[i, "Sample_ID"] == "Meth_Control"){
-    print(paste("Methylated control is on row", i, "at postion", pheno[i, "Basename"], sep = " "))
+    print(paste("Methylated control is on row", i, "at postion", SampleSheet[i, "Basename"], sep = " "))
   }
 }
   
