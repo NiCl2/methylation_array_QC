@@ -36,9 +36,12 @@ for(i in 1:nrow(SampleSheet)){
      }
 }
 
+print(paste("There are", length(unique(SampleSheet$Individual_ID)), "Individuals in the study", sep=" "))
+
 print(paste("The range of ages is", min(SampleSheet$Age, na.rm = TRUE), "to", max(SampleSheet$Age, na.rm = TRUE), sep= " "))
 
  }
+ 
 
 SampleSheet_test(SampleSheet)
 

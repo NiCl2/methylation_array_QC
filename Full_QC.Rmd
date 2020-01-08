@@ -54,33 +54,35 @@ SampleSheet$Control <- SampleSheet$Sample_ID == "Meth_Control"
 ## make chip name full (R often changes this to scientific notation)
 SampleSheet$Basename2<-SampleSheet$Basename
 SampleSheet<-separate(data = SampleSheet, col = Basename2, into = c("SentrixID", "Position"), sep="_")
+```
 
-
-
-#First copy the idats over to knight using "scp 201114400019/*.idat gShireby@knight.ex.ac.uk:/mnt/data1/BDR/Methylation/idats/" and then use "chmod a+r *.idat" to change the permissions so all users can read the files
+```{r Making Mset and RGset, echo=FALSE, message=FALSE}
+setwd("/mnt/data1/Array_Projects/")
+#First copy the idats over to knight using "scp 201114400019/*.idat gNeilson@knight.ex.ac.uk:/mnt/data1/BDR/Methylation/idats/" and then use "chmod a+r *.idat" to change the permissions so all users can read the files
 idatPath<-c("/mnt/data1/Array_Projects/Idats")
 
 #For most steps we need the idats as a methylumiSet but for some we need an RGset
 #These take a while to create - so saving as R objects to load faster next time
 
-if(file.exists(file= paste("/mnt/data1/Array_Projects", params$Mset, sep = "/"))){
-  load(file = paste("/mnt/data1/Array_Projects", params$Mset, sep = "/"))
+if(file.exists(file=  params$Mset)){
+  load(file = params$Mset)
   print(paste("Loading Mset:", params$Mset))
 } else {
 msetEPIC <- readEPIC(idatPath=idatPath, barcodes=SampleSheet$Basename, parallel = FALSE, force=T)
 save(msetEPIC, params$Mset)
+print(paste("Mset created and saved as", params$Mset))
 }
 
-if(file.exists(file= paste("/mnt/data1/Array_Projects", params$RGset, sep = "/"))){
-  load(file= paste("/mnt/data1/Array_Projects", params$RGset, sep = "/"))
+if(file.exists(file= params$RGset)){
+  load(file= params$RGset)
   print(paste("Loading RGset:", params$RGset))
 } else{
 RGset <- read.metharray.exp(base = idatPath, targets = SampleSheet, force = TRUE)
 save(RGset,params$RGset)
+print(paste("RGset created and saved as", params$RGset))
 }
 ```
 
-```
 
 ###Study Information
 **Study:** `r params$Name`

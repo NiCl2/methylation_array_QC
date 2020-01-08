@@ -50,7 +50,7 @@ SampleSheet$Basename2<-SampleSheet$Basename
 SampleSheet<-separate(data = SampleSheet, col = Basename2, into = c("SentrixID", "Position"), sep="_")
 ```
 
-```{r Making Mset and RGset, echo=FALSE}
+```{r Making Mset and RGset, echo=FALSE, message=FALSE}
 setwd("/mnt/data1/Array_Projects/")
 #First copy the idats over to knight using "scp 201114400019/*.idat gNeilson@knight.ex.ac.uk:/mnt/data1/BDR/Methylation/idats/" and then use "chmod a+r *.idat" to change the permissions so all users can read the files
 idatPath<-c("/mnt/data1/Array_Projects/Idats")
