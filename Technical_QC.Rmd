@@ -82,11 +82,11 @@ print(paste("RGset created and saved as", params$RGset))
 
 **Description:** Brains for Dementia research. 
 
-**Arrays ran by:** `r print(SampleSheet[1,"Name"])`, The University of Exeter Medical School
+**Arrays ran by:** `r print(SampleSheet[1,"Name_lab"])`, The University of Exeter Medical School
 
 **Array used:** Illumina EPIC microarray v1.0
 
-**QC done by:**Grant Neilson, The University of Exeter Medical School
+**QC done by:**`r print(SampleSheet[1,"Name_QC"])`, The University of Exeter Medical School
 
 **Date of QC:** `r format(Sys.Date(), format="%d %B %Y")`
 
@@ -154,9 +154,6 @@ legend("topright", levels(factor(plotfactor)), col = rainbow(nlevels(plotfactor)
 #coloured by plate
 if(!is.na(SampleSheet[1,"Plate"])){
 plotfactor<-factor(SampleSheet$Plate, levels=c(unique(SampleSheet$Plate)))
-par(mfrow = c(1,2))
-hist(M.median, xlab = "Median M intensity", main="Histogram of Median Methylated Intensities", cex.main=0.7)
-hist(U.median, xlab = "Median U intensity", main="Histogram of Median Unmethylated Intensities", cex.main=0.7)
 par(mfrow = c(1,1))
 plot(M.median, U.median, pch = 16, xlab = "Median M intensity", ylab = "Median U intensity", col = rainbow(nlevels(plotfactor))[factor(plotfactor)], main="Scatter plot of Signal Intensities coloured by plate")
 par(xpd=TRUE)
@@ -166,9 +163,6 @@ legend("topright", levels(factor(plotfactor)), col = rainbow(nlevels(plotfactor)
 ##Coloured by Cell type
 if(!is.na(SampleSheet[1,"Cell_Type"])){
 plotfactor<-factor(SampleSheet$Cell_Type, levels=c(unique(SampleSheet$Cell_Type)))
-par(mfrow = c(1,2))
-hist(M.median, xlab = "Median M intensity", main="Histogram of Median Methylated Intensities", cex.main=0.7)
-hist(U.median, xlab = "Median U intensity", main="Histogram of Median Unmethylated Intensities", cex.main=0.7)
 par(mfrow = c(1,1))
 plot(M.median, U.median, pch = 16, xlab = "Median M intensity", ylab = "Median U intensity", col = rainbow(nlevels(plotfactor))[factor(plotfactor)], main="Scatter plot of Signal Intensities coloured by Cell Type")
 par(xpd=TRUE)
@@ -178,9 +172,6 @@ legend("topright", levels(factor(plotfactor)), col = rainbow(nlevels(plotfactor)
 ## Coloured By Race
 if(!is.na(SampleSheet[1,"Race"])){
 plotfactor<-factor(SampleSheet$Race, levels=c(unique(SampleSheet$Race)))
-par(mfrow = c(1,2))
-hist(M.median, xlab = "Median M intensity", main="Histogram of Median Methylated Intensities", cex.main=0.7)
-hist(U.median, xlab = "Median U intensity", main="Histogram of Median Unmethylated Intensities", cex.main=0.7)
 par(mfrow = c(1,1))
 plot(M.median, U.median, pch = 16, xlab = "Median M intensity", ylab = "Median U intensity", col = rainbow(nlevels(plotfactor))[factor(plotfactor)], main="Scatter plot of Signal Intensities coloured by Race")
 par(xpd=TRUE)
@@ -190,9 +181,6 @@ legend("topright", levels(factor(plotfactor)), col = rainbow(nlevels(plotfactor)
 ##Colourefd by Tisssue type
 if(!is.na(SampleSheet[1,"Tissue_Type"])){
 plotfactor<-factor(SampleSheet$Tissue_Type, levels=c(unique(SampleSheet$Tissue_Type)))
-par(mfrow = c(1,2))
-hist(M.median, xlab = "Median M intensity", main="Histogram of Median Methylated Intensities", cex.main=0.7)
-hist(U.median, xlab = "Median U intensity", main="Histogram of Median Unmethylated Intensities", cex.main=0.7)
 par(mfrow = c(1,1))
 plot(M.median, U.median, pch = 16, xlab = "Median M intensity", ylab = "Median U intensity", col = rainbow(nlevels(plotfactor))[factor(plotfactor)], main="Scatter plot of Signal Intensities coloured by Tissue Type")
 par(xpd=TRUE)
@@ -202,9 +190,6 @@ legend("topright", levels(factor(plotfactor)), col = rainbow(nlevels(plotfactor)
 ##Coloured by Organ
 if(!is.na(SampleSheet[1,"Organ"])){
 plotfactor<-factor(SampleSheet$Organ, levels=c(unique(SampleSheet$Organ)))
-par(mfrow = c(1,2))
-hist(M.median, xlab = "Median M intensity", main="Histogram of Median Methylated Intensities", cex.main=0.7)
-hist(U.median, xlab = "Median U intensity", main="Histogram of Median Unmethylated Intensities", cex.main=0.7)
 par(mfrow = c(1,1))
 plot(M.median, U.median, pch = 16, xlab = "Median M intensity", ylab = "Median U intensity", col = rainbow(nlevels(plotfactor))[factor(plotfactor)], main="Scatter plot of Signal Intensities coloured by Organ")
 par(xpd=TRUE)
@@ -214,9 +199,6 @@ legend("topright", levels(factor(plotfactor)), col = rainbow(nlevels(plotfactor)
 ##Coloured by SentrixID
 if(!is.na(SampleSheet[1,"SentrixID"])){
 plotfactor<-factor(SampleSheet$SentrixID, levels=c(unique(SampleSheet$SentrixID)))
-par(mfrow = c(1,2))
-hist(M.median, xlab = "Median M intensity", main="Histogram of Median Methylated Intensities", cex.main=0.7)
-hist(U.median, xlab = "Median U intensity", main="Histogram of Median Unmethylated Intensities", cex.main=0.7)
 par(mfrow = c(1,1))
 plot(M.median, U.median, pch = 16, xlab = "Median M intensity", ylab = "Median U intensity", col = rainbow(nlevels(plotfactor))[factor(plotfactor)], main="Scatter plot of Signal Intensities coloured by SentrixID")
 par(xpd=TRUE)
@@ -286,7 +268,6 @@ for(plate in plates){
 The fully methylated controls have their intensities logged, and saved to FullyMethylatedControlSamples.csv for cross-study comparisions of the scanner.
 
 ```{r removecontrols, include=FALSE}
-Controls <- SampleSheet[SampleSheet$Control, "Basename"]
 Previous_FMpheno <- read.csv("/mnt/data1/Array_Projects/Methylated_Controls/AllFullyMethylatedControlSamples.csv")
 FMpheno<-QCmetrics[SampleSheet$Control,c("Basename", "SentrixID", "Position", "M.median", "U.median")]
 Betas_meth_control <- betas[,SampleSheet$Control]
@@ -295,7 +276,8 @@ Betas_meth_control <- betas[,SampleSheet$Control]
 # #we also want to manually find the time they were processed (this is the time stamp of the idats on the MDrive)
 meth_controls <- SampleSheet[SampleSheet$Control, c("Basename")]
 
- times<-data.frame(Date_Ran=rep(Sys.Date(),length(meth_controls)))
+times<-SampleSheet[which(SampleSheet$Basename %in% meth_controls), c("Date_array_run", "Date_Bisulphite_con")]
+
 # add some study info and save
 info<-data.frame(Study=rep(params$Name,nrow(FMpheno)), iDAT_Location=rep(idatPath, nrow(FMpheno)))
 FMpheno<-cbind(info, times, FMpheno)
@@ -384,17 +366,23 @@ print(Stepsummary)
 
 
 ```{r Array statistics, echo= FALSE}
-EpicManifest <- read.csv("/mnt/data1/IndiaWorkshop/epicManifest.csv", stringsAsFactors = F, header=T)
-control_probes <- EpicManifest[which(EpicManifest$AddressA_ID %in% ctrlAddress), "Name"]
 
-## Plotting control probes from fully methylated control
-RGset_controls <- RGset[,which(RGset@colData@listData$Basename %in% Controls)]
-par(mfrow=c(1,2))
+## Plotting control probes from fully methylated controls
+RGset_controls <- RGset[,which(RGset@colData@listData$Basename %in% meth_controls)]
+par(mfrow=c(1,1))
 controlStripPlot(RGset_controls, controls = "BISULFITE CONVERSION I")
 controlStripPlot(RGset_controls, controls = "BISULFITE CONVERSION II")
+controlStripPlot(RGset_controls, controls = "EXTENSION")
+controlStripPlot(RGset_controls, controls = "STAINING")
+controlStripPlot(RGset_controls, controls = "HYBRIDIZATION")
+controlStripPlot(RGset_controls, controls = "TARGET REMOVAL")
+controlStripPlot(RGset_controls, controls = "SPECIFICITY I")
+controlStripPlot(RGset_controls, controls = "SPECIFICITY II")
+controlStripPlot(RGset_controls, controls = "NON-POLYMORPHIC")
+controlStripPlot(RGset_controls, controls = "NEGATIVE")
+controlStripPlot(RGset_controls, controls = "NORM_A")
+controlStripPlot(RGset_controls, controls = "NORM_T")
+controlStripPlot(RGset_controls, controls = "NORM_C")
+controlStripPlot(RGset_controls, controls = "NORM_G")
 
-r <- getRed(RGset)
-g <- getGreen(RGset)
-ctrlAddress <- getControlAddress(RGset)
-	ctlWide <- as.matrix(log2(r[ctrlAddress, , drop = FALSE]))
 ```
