@@ -5,8 +5,8 @@ output: html_document
 params: 
   Name: Study_Name
   SampleSheet: SampleSheet_NCBI.csv
-  Mset: Mset_Name.rdat
-  RGset: RGset_Name.rdat
+  Mset: NCBI_Mset.rdat
+  RGset: NCBI_RGset.rdat
 ---
 
 ```{r setup, include=FALSE}
@@ -286,6 +286,7 @@ for(plate in plates){
 The fully methylated controls have their intensities logged, and saved to FullyMethylatedControlSamples.csv for cross-study comparisions of the scanner.
 
 ```{r removecontrols, include=FALSE}
+Controls <- SampleSheet[SampleSheet$Control, "Basename"]
 Previous_FMpheno <- read.csv("/mnt/data1/Array_Projects/Methylated_Controls/AllFullyMethylatedControlSamples.csv")
 FMpheno<-QCmetrics[SampleSheet$Control,c("Basename", "SentrixID", "Position", "M.median", "U.median")]
 Betas_meth_control <- betas[,SampleSheet$Control]
@@ -299,7 +300,7 @@ meth_controls <- SampleSheet[SampleSheet$Control, c("Basename")]
 info<-data.frame(Study=rep(params$Name,nrow(FMpheno)), iDAT_Location=rep(idatPath, nrow(FMpheno)))
 FMpheno<-cbind(info, times, FMpheno)
 FMpheno <- rbind(Previous_FMpheno, FMpheno)
- write.csv(FMpheno, "/mnt/data1/Array_Projects/Methylated_Controls/AllFullyMethylatedControlSamples.csv", row.names=FALSE)
+ write.csv(FMpheno, "/mnt/data1/Array_Projects/Methylated_Controls/AllFullyMethylatedControlSamples.csv",row.names=FALSE)
 
 
 #remove from all variables
@@ -382,17 +383,18 @@ print(Stepsummary)
 ```
 
 
-```{r Array statistics}
+```{r Array statistics, echo= FALSE}
+EpicManifest <- read.csv("/mnt/data1/IndiaWorkshop/epicManifest.csv", stringsAsFactors = F, header=T)
+control_probes <- EpicManifest[which(EpicManifest$AddressA_ID %in% ctrlAddress), "Name"]
 
-# 
-# Chip_ID <- unique(SampleSheet$SentrixID)
-# meth_controls_betas <- betas[,SampleSheet$Control]
-# mean_betas <- matrix(data = NA, ncol = 1, nrow = ncol(meth_controls_betas))
-# rownames(mean_betas)<-colnames(meth_controls_betas)
-# colnames(mean_betas) <-c("Mean_beta_value")
-# for(i in 1:ncol(meth_controls_betas)){
-#   tmp <- meth_controls_betas[,i]
-#   mean_betas[i,1] <- median(tmp, na.rm =TRUE)
-# }
+## Plotting control probes from fully methylated control
+RGset_controls <- RGset[,which(RGset@colData@listData$Basename %in% Controls)]
+par(mfrow=c(1,2))
+controlStripPlot(RGset_controls, controls = "BISULFITE CONVERSION I")
+controlStripPlot(RGset_controls, controls = "BISULFITE CONVERSION II")
 
+r <- getRed(RGset)
+g <- getGreen(RGset)
+ctrlAddress <- getControlAddress(RGset)
+	ctlWide <- as.matrix(log2(r[ctrlAddress, , drop = FALSE]))
 ```
