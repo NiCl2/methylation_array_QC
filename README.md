@@ -17,6 +17,8 @@ Name: Study_Name
 
 SampleSheet: SampleSheet_Name.csv
 
+PathTOProjectFolder: /mnt/data1/Array_Projects/...
+
 Mset: Mset_Name.rdat
 
 RGset: RGset_Name.rdat
