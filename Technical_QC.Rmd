@@ -5,6 +5,7 @@ output: html_document
 params: 
   Name: Study_Name
   SampleSheet: SampleSheet_NCBI.csv
+  PathToProjectFolder: /mnt/data1/Array_Projects/Dummy_Data/
   Mset: NCBI_Mset.rdat
   RGset: NCBI_RGset.rdat
 ---
@@ -34,7 +35,7 @@ library(tidyr)
 library(dplyr)
 library(IlluminaHumanMethylationEPICanno.ilm10b2.hg19)
 
-setwd("/mnt/data1/Array_Projects/")
+setwd(params$PathToProjectFolder)
 
 SampleSheet<-read.csv(file = params$SampleSheet, stringsAsFactors = FALSE)
 SampleSheet$Sex <- as.factor(SampleSheet$Sex)
@@ -51,7 +52,7 @@ SampleSheet<-separate(data = SampleSheet, col = Basename2, into = c("SentrixID",
 ```
 
 ```{r Making Mset and RGset, echo=FALSE, message=FALSE}
-setwd("/mnt/data1/Array_Projects/")
+setwd(params$PathToProjectFolder)
 #First copy the idats over to knight using "scp 201114400019/*.idat gNeilson@knight.ex.ac.uk:/mnt/data1/BDR/Methylation/idats/" and then use "chmod a+r *.idat" to change the permissions so all users can read the files
 idatPath<-c("/mnt/data1/Array_Projects/Idats")
 
@@ -63,7 +64,7 @@ if(file.exists(file=  params$Mset)){
   print(paste("Loading Mset:", params$Mset))
 } else {
 msetEPIC <- readEPIC(idatPath=idatPath, barcodes=SampleSheet$Basename, parallel = FALSE, force=T)
-save(msetEPIC, params$Mset)
+save(msetEPIC, paste(params$PathToProjectFolder, params$Mset, sep=""))
 print(paste("Mset created and saved as", params$Mset))
 }
 
@@ -72,7 +73,7 @@ if(file.exists(file= params$RGset)){
   print(paste("Loading RGset:", params$RGset))
 } else{
 RGset <- read.metharray.exp(base = idatPath, targets = SampleSheet, force = TRUE)
-save(RGset,params$RGset)
+save(RGset,paste(params$PathToProjectFolder, params$RGset, sep=""))
 print(paste("RGset created and saved as", params$RGset))
 }
 ```
@@ -385,4 +386,73 @@ controlStripPlot(RGset_controls, controls = "NORM_T")
 controlStripPlot(RGset_controls, controls = "NORM_C")
 controlStripPlot(RGset_controls, controls = "NORM_G")
 
+```
+
+##Check Sex
+A principal component analysis of the methylation data can be used to predict the sex of the samples.
+
+The principal components are calculated, and the two which correlate most with sex are found. These can be used to generate a scatter plot where the sexes are clearly separated.
+
+
+```{r definegenderfunction, include=FALSE}
+findGenderPC<-function(betas, sex, npcs = 20){
+
+	betas.com<-betas[complete.cases(betas),]
+	pca<-prcomp(betas.com)
+
+	pca.cor<-rep(NA, npcs)
+	for(i in 1:npcs){
+		pca.cor[i]<-cor(pca$rotation[,i], as.numeric(as.factor(sex)), use = "complete")
+	}
+	top<-order(abs(pca.cor), decreasing = TRUE)[1]
+	second<-order(abs(pca.cor), decreasing = TRUE)[2]
+	print(paste("Top correlated principal components with sex:", top, ",", second))
+
+	predSex<-rep(NA, length(sex))
+	options.sex<-levels(as.factor(sex))
+
+	if(abs(pca.cor[top]) > 0.9){
+		print("Top PC has r > 0.9 with sex so good enough to confirm reported sexes")
+	} else {
+	  print(paste("Top PC has r =", round(abs(pca.cor[top]),2), "with sex so may not be good enough to confirm reported sexes"))
+	}
+
+	if(sign(pca.cor[top]) == 1){
+		predSex[which(pca$rotation[,top] < 0)]<-options.sex[1]
+		predSex[which(pca$rotation[,top] > 0)]<-options.sex[2]
+	} else {
+		predSex[which(pca$rotation[,top] < 0)]<-options.sex[2]
+		predSex[which(pca$rotation[,top] > 0)]<-options.sex[1]
+	}
+
+	plot(pca$rotation[,top], pca$rotation[,second], pch = 16, col = rainbow(3)[as.factor(sex)], xlab = paste("PC", top), ylab = paste("PC", second), main="PC Plot Coloured by Reported Sex")
+	legend("bottomright", levels(as.factor(sex)), pch = 16, col = rainbow(3))
+
+	#using mismatch to add labels to failed samples
+  #mismatch<-which(predSex!=sex)
+  #text(pca$rotation[mismatch,top], pca$rotation[mismatch, second], #labels=colnames(betas)[mismatch], cex=0.7, pos=4)
+
+	return(predSex)
+}
+
+```
+
+```{r predictsex, echo=FALSE}
+betas<-betas(msetEPIC)
+ReportedSex<-SampleSheet$Sex
+PredictedSex<-findGenderPC(betas,ReportedSex)
+```
+
+Here `r sum(PredictedSex!=ReportedSex, na.rm=T)` sample who's predicted sex does not match their reported sex fails the QC according to the findGenderPC function and `r sum(PredictedSex!=ReportedSex, na.rm=T)`.
+
+```{r updateQCmetrics3, include=FALSE}
+QCmetrics<-cbind(QCmetrics, PredictedSex)
+QCmetrics$MismatchSex<-PredictedSex!=ReportedSex
+SamplesFail[which(PredictedSex!=ReportedSex)]<-TRUE
+Step3<-c(length(which(PredictedSex!=ReportedSex)),sum(SamplesFail))
+Stepsummary<-cbind(Stepsummary,Step3)
+```
+
+```{r Stepsummary3}
+print(Stepsummary)
 ```
