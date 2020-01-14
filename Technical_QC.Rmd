@@ -264,12 +264,32 @@ for(plate in plates){
 }
 ```
 
+```{r Array statistics, echo= FALSE}
 
+## Plotting control probes from fully methylated controls
+RGset_controls <- RGset[,which(RGset@colData@listData$Basename %in% meth_controls)]
+par(mfrow=c(1,1))
+controlStripPlot(RGset_controls, controls = "BISULFITE CONVERSION I")
+controlStripPlot(RGset_controls, controls = "BISULFITE CONVERSION II")
+controlStripPlot(RGset_controls, controls = "EXTENSION")
+controlStripPlot(RGset_controls, controls = "STAINING")
+controlStripPlot(RGset_controls, controls = "HYBRIDIZATION")
+controlStripPlot(RGset_controls, controls = "TARGET REMOVAL")
+controlStripPlot(RGset_controls, controls = "SPECIFICITY I")
+controlStripPlot(RGset_controls, controls = "SPECIFICITY II")
+controlStripPlot(RGset_controls, controls = "NON-POLYMORPHIC")
+controlStripPlot(RGset_controls, controls = "NEGATIVE")
+controlStripPlot(RGset_controls, controls = "NORM_A")
+controlStripPlot(RGset_controls, controls = "NORM_T")
+controlStripPlot(RGset_controls, controls = "NORM_C")
+controlStripPlot(RGset_controls, controls = "NORM_G")
+
+```
 
 The fully methylated controls have their intensities logged, and saved to FullyMethylatedControlSamples.csv for cross-study comparisions of the scanner.
 
 ```{r removecontrols, include=FALSE}
-Previous_FMpheno <- read.csv("/mnt/data1/Array_Projects/Methylated_Controls/AllFullyMethylatedControlSamples.csv")
+Previous_FMpheno <- read.csv("/mnt/data1/Array_Projects/Methylated_Controls/ComparingFullyMethylatedControls.csv")
 FMpheno<-QCmetrics[SampleSheet$Control,c("Basename", "SentrixID", "Position", "M.median", "U.median")]
 Betas_meth_control <- betas[,SampleSheet$Control]
 
@@ -283,7 +303,7 @@ times<-SampleSheet[which(SampleSheet$Basename %in% meth_controls), c("Date_array
 info<-data.frame(Study=rep(params$Name,nrow(FMpheno)), iDAT_Location=rep(idatPath, nrow(FMpheno)))
 FMpheno<-cbind(info, times, FMpheno)
 FMpheno <- rbind(Previous_FMpheno, FMpheno)
- write.csv(FMpheno, "/mnt/data1/Array_Projects/Methylated_Controls/AllFullyMethylatedControlSamples.csv",row.names=FALSE)
+ write.csv(FMpheno, "/mnt/data1/Array_Projects/Methylated_Controls/ComparingFullyMethylatedControls.csv",row.names=FALSE)
 
 
 #remove from all variables
@@ -366,27 +386,7 @@ print(Stepsummary)
 ```
 
 
-```{r Array statistics, echo= FALSE}
 
-## Plotting control probes from fully methylated controls
-RGset_controls <- RGset[,which(RGset@colData@listData$Basename %in% meth_controls)]
-par(mfrow=c(1,1))
-controlStripPlot(RGset_controls, controls = "BISULFITE CONVERSION I")
-controlStripPlot(RGset_controls, controls = "BISULFITE CONVERSION II")
-controlStripPlot(RGset_controls, controls = "EXTENSION")
-controlStripPlot(RGset_controls, controls = "STAINING")
-controlStripPlot(RGset_controls, controls = "HYBRIDIZATION")
-controlStripPlot(RGset_controls, controls = "TARGET REMOVAL")
-controlStripPlot(RGset_controls, controls = "SPECIFICITY I")
-controlStripPlot(RGset_controls, controls = "SPECIFICITY II")
-controlStripPlot(RGset_controls, controls = "NON-POLYMORPHIC")
-controlStripPlot(RGset_controls, controls = "NEGATIVE")
-controlStripPlot(RGset_controls, controls = "NORM_A")
-controlStripPlot(RGset_controls, controls = "NORM_T")
-controlStripPlot(RGset_controls, controls = "NORM_C")
-controlStripPlot(RGset_controls, controls = "NORM_G")
-
-```
 
 ##Check Sex
 A principal component analysis of the methylation data can be used to predict the sex of the samples.
