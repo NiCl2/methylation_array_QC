@@ -8,7 +8,7 @@ look at which paramters need to be added in the YAML sectio nat the top of the R
 
 to submitt the Rmd run this code in the shell
 
-Rscript -e 'library(rmarkdown);rmarkdown::render("Name_of_Rmd.Rmd", params = list(Name = "Bipolar Study", SampleSheet = "SampleSheet_NCBI.csv", Mset = "NCBI_Mset.rdat", RGset = "NCBI_RGset.rdat"))'
+Rscript -e 'library(rmarkdown);rmarkdown::render("Name_of_Rmd.Rmd", params = list(Name = "Bipolar Study", SampleSheet = "SampleSheet_NCBI.csv", Mset = "NCBI_Mset.rdat", RGset = "NCBI_RGset.rdat"), output_file = "/mnt/data1/Array_Projects/Dummy_Data/test.html")'
 
 # Technical QC
 Technical QC has 4 parameters 
@@ -16,6 +16,8 @@ Technical QC has 4 parameters
 Name: Study_Name
 
 SampleSheet: SampleSheet_Name.csv
+
+PathTOProjectFolder: /mnt/data1/Array_Projects/...
 
 Mset: Mset_Name.rdat
 
