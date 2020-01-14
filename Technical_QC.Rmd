@@ -40,7 +40,7 @@ setwd(params$PathToProjectFolder)
 SampleSheet<-read.csv(file = params$SampleSheet, stringsAsFactors = FALSE)
 SampleSheet$Sex <- as.factor(SampleSheet$Sex)
 
-rownames(SampleSheet) <- SampleSheet$test
+rownames(SampleSheet) <- SampleSheet$Basename
 
 SampleSheet$Empty <- is.na(SampleSheet$Sample_ID) 
 SampleSheet$Control <- SampleSheet$Sample_ID == "Meth_Control"
