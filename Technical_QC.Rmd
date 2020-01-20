@@ -5,7 +5,7 @@ output: html_document
 params: 
   Name: Study_Name
   SampleSheet: SampleSheet_NCBI.csv
-  PathToProjectFolder: /mnt/data1/Array_Projects/Dummy_Data/
+  PathToProjectFolder: /mnt/data1/Array_Projects/
   Mset: NCBI_Mset.rdat
   RGset: NCBI_RGset.rdat
 ---
@@ -81,8 +81,6 @@ print(paste("RGset created and saved as", params$RGset))
 ###Study Information
 **Study:** `r params$Name`
 
-**Description:** Brains for Dementia research. 
-
 **Arrays ran by:** `r print(SampleSheet[1,"Name_lab"])`, The University of Exeter Medical School
 
 **Array used:** Illumina EPIC microarray v1.0
@@ -93,9 +91,7 @@ print(paste("RGset created and saved as", params$RGset))
 
 **Sample ages:** `r range(SampleSheet$Age)`
 
-**Sample Organ:** `r if(!is.na(SampleSheet[1,"Organ"])){print(SampleSheet[1,"Organ"])}` 
-
-**Sample Tissue:** `r paste(unique(SampleSheet$Tissue_Type))` 
+**Sample Tissue:** `r paste(SampleSheet[1,"Tissue_Type"])` 
 
 ##QC Information 
 
@@ -208,7 +204,6 @@ legend("topright", levels(factor(plotfactor)), col = rainbow(nlevels(plotfactor)
 
 ```
 
-
 The signal intensities are okay for these samples. 
  
 To further investigate the plates we can plot heatmaps of the intensities, shown below.
@@ -263,7 +258,7 @@ for(plate in plates){
   grid.arrange(plot1, plot2, legend, ncol=3, widths=c(3/7, 3/7, 1/7), top=paste("", plate))
 }
 ```
-
+Intensities from the various control probes on the array are plotted to check the experiment has worked as expected. 
 ```{r Array statistics, echo= FALSE}
 
 ## Plotting control probes from fully methylated controls
@@ -328,7 +323,6 @@ SampleSheet<-SampleSheet[!SampleSheet$Empty,]
 ```
 
 Although signal intensity is the largest predictor of sample quality, the threshold at which to exclude samples can vary from experiment to experiment - for example, signal intensities can vary slightly depending on tissue type or DNA extraction method. Samples which clearly deviate from the main cluster on the signal intensity plots should be removed. 
-These samples had lower signal intensities than usual
 
 ```{r}
 
@@ -368,7 +362,7 @@ Bisulphite<-bscon(msetEPIC)
 hist(Bisulphite, xlab = "Median % BS conversion", main = "Histogram of Bisulphite Converstion Statistics")
 ```
 
-This shows the conversion statistics were generally high. Samples with a conversion < 80% fail the QC, so with this threshold `r sum(Bisulphite<80)` samples fail the QC, and will be removed at a later stage.
+Samples with a conversion < 80% fail the QC, so with this threshold `r sum(Bisulphite<80)` samples fail the QC, and will be removed at a later stage.
 
 
 ```{r updateQCmetrics2, include=FALSE}
@@ -443,7 +437,7 @@ ReportedSex<-SampleSheet$Sex
 PredictedSex<-findGenderPC(betas,ReportedSex)
 ```
 
-Here `r sum(PredictedSex!=ReportedSex, na.rm=T)` sample who's predicted sex does not match their reported sex fails the QC according to the findGenderPC function and `r sum(PredictedSex!=ReportedSex, na.rm=T)`.
+Here `r sum(PredictedSex!=ReportedSex, na.rm=T)` number of sampless predicted sex does not match their reported sex. These samples fail the QC according to the findGenderPC function and, and will be removed.
 
 ```{r updateQCmetrics3, include=FALSE}
 QCmetrics<-cbind(QCmetrics, PredictedSex)
