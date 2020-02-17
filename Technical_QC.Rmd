@@ -3,11 +3,11 @@ title: "Technical QC"
 author: "G Neilson"
 output: html_document
 params: 
-  Name: Study_Name
-  SampleSheet: SampleSheet_NCBI.csv
-  PathToProjectFolder: /mnt/data1/Array_Projects/
-  Mset: NCBI_Mset.rdat
-  RGset: NCBI_RGset.rdat
+  Name: Portland_Batch2
+  SampleSheet: Sample_Sheet_Batch2.csv
+  PathToProjectFolder: /mnt/data1/Array_Projects/Portland_Samples/Batch2
+  Mset: Batch2Portland_Mset.rdat
+  RGset: Batch2Portland_RGset.rdat
 ---
 
 ```{r setup, include=FALSE}
@@ -64,7 +64,7 @@ if(file.exists(file=  params$Mset)){
   print(paste("Loading Mset:", params$Mset))
 } else {
 msetEPIC <- readEPIC(idatPath=idatPath, barcodes=SampleSheet$Basename, parallel = FALSE, force=T)
-save(msetEPIC, paste(params$PathToProjectFolder, params$Mset, sep=""))
+save(msetEPIC, file = paste(params$PathToProjectFolder, params$Mset, sep=""))
 print(paste("Mset created and saved as", params$Mset))
 }
 
@@ -73,7 +73,7 @@ if(file.exists(file= params$RGset)){
   print(paste("Loading RGset:", params$RGset))
 } else{
 RGset <- read.metharray.exp(base = idatPath, targets = SampleSheet, force = TRUE)
-save(RGset,paste(params$PathToProjectFolder, params$RGset, sep=""))
+save(RGset,file = paste(params$PathToProjectFolder, params$RGset, sep=""))
 print(paste("RGset created and saved as", params$RGset))
 }
 ```
@@ -81,19 +81,20 @@ print(paste("RGset created and saved as", params$RGset))
 ###Study Information
 **Study:** `r params$Name`
 
-**Arrays ran by:** `r print(SampleSheet[1,"Name_lab"])`, The University of Exeter Medical School
+**Arrays ran by:** `r SampleSheet[1,"Name_lab"]`, The University of Exeter Medical School
 
 **Array used:** Illumina EPIC microarray v1.0
 
-**QC done by:**`r print(SampleSheet[1,"Name_QC"])`, The University of Exeter Medical School
+**QC done by:**`r SampleSheet[1,"Name_QC"]`, The University of Exeter Medical School
 
 **Date of QC:** `r format(Sys.Date(), format="%d %B %Y")`
 
-**Sample ages:** `r range(SampleSheet$Age)`
+**Sample ages:** `r range(SampleSheet$Age, na.rm = TRUE)`
 
-**Sample Tissue:** `r paste(SampleSheet[1,"Tissue_Type"])` 
+**Sample Tissue:** `r unique(SampleSheet$Organ)` 
 
 ##QC Information 
+
 
 
 ```{r createQCmetrics, echo=FALSE}
@@ -117,9 +118,11 @@ SamplesFail<-as.logical(rep("FALSE", nrow(SampleSheet)))
 
 Stepsummary<-as.data.frame(matrix(ncol=0, nrow=2))
 rownames(Stepsummary)<-c("Failed This Step", "Total Failed")
+
 ```
 
-The phenotype file containing the sample information was loaded into R. Then the methylation data for the `r nrow(SampleSheet)` samples were loaded into a methylumiset. This contains `r nrow(SampleSheet[SampleSheet$Sample_ID != "Meth_control",])` `r params$Name` and `r nrow(SampleSheet[SampleSheet$Sample_ID == "Meth_control",])` fully methylated control samples.
+
+The phenotype file containing the sample information was loaded into R. Then the methylation data for the `r nrow(SampleSheet)` samples were loaded into a methylumiset. This contains `r nrow(SampleSheet[SampleSheet$Sample_ID != "Meth_Control",])` `r params$Name` and `r nrow(SampleSheet[SampleSheet$Sample_ID == "Meth_Control",])` fully methylated control samples.
 
 ##Check Signal Intensities
 The intensity check is the biggest indicator of sample quality. The median methylated signal intensity and unmethylated signal intensity for each sample is calculcated.
@@ -135,9 +138,7 @@ QCmetrics<-cbind(SampleSheet,M.median, U.median)
 A histogram and scatter plot of the resulting data are plotted to visualise the data quality. Samples are coloured by methylation plate or institute, to make sure there are no batch effects.
 
 ```{r plotintensities, echo=FALSE}
-
 # coloured by institute
-if(!is.na(SampleSheet[1,"Institute"])){
 plotfactor<-factor(SampleSheet$Institute, levels=c(unique(SampleSheet$Institute))) 
 par(mfrow = c(1,2))
 hist(M.median, xlab = "Median M intensity", main="Histogram of Median Methylated Intensities", cex.main=0.7)
@@ -146,61 +147,44 @@ par(mfrow = c(1,1))
 plot(M.median, U.median, pch = 16, xlab = "Median M intensity", ylab = "Median U intensity", col = rainbow(nlevels(plotfactor))[factor(plotfactor)], main="Scatter plot of Signal Intensities coloured by Institue")
 par(xpd=TRUE)
 legend("topright", levels(factor(plotfactor)), col = rainbow(nlevels(plotfactor)), pch = 10, cex=0.5)
-}
 
 #coloured by plate
-if(!is.na(SampleSheet[1,"Plate"])){
 plotfactor<-factor(SampleSheet$Plate, levels=c(unique(SampleSheet$Plate)))
 par(mfrow = c(1,1))
 plot(M.median, U.median, pch = 16, xlab = "Median M intensity", ylab = "Median U intensity", col = rainbow(nlevels(plotfactor))[factor(plotfactor)], main="Scatter plot of Signal Intensities coloured by plate")
 par(xpd=TRUE)
 legend("topright", levels(factor(plotfactor)), col = rainbow(nlevels(plotfactor)), pch = 10, cex=0.5)
-}
 
-##Coloured by Cell type
-if(!is.na(SampleSheet[1,"Cell_Type"])){
-plotfactor<-factor(SampleSheet$Cell_Type, levels=c(unique(SampleSheet$Cell_Type)))
+## Coloured By Ethnicity
+plotfactor<-factor(SampleSheet$Ethnicity, levels=c(unique(SampleSheet$Ethnicity)))
 par(mfrow = c(1,1))
-plot(M.median, U.median, pch = 16, xlab = "Median M intensity", ylab = "Median U intensity", col = rainbow(nlevels(plotfactor))[factor(plotfactor)], main="Scatter plot of Signal Intensities coloured by Cell Type")
+plot(M.median, U.median, pch = 16, xlab = "Median M intensity", ylab = "Median U intensity", col = rainbow(nlevels(plotfactor))[factor(plotfactor)], main="Scatter plot of Signal Intensities coloured by Ethnicity")
 par(xpd=TRUE)
 legend("topright", levels(factor(plotfactor)), col = rainbow(nlevels(plotfactor)), pch = 10, cex=0.5)
-}
-
-## Coloured By Race
-if(!is.na(SampleSheet[1,"Race"])){
-plotfactor<-factor(SampleSheet$Race, levels=c(unique(SampleSheet$Race)))
-par(mfrow = c(1,1))
-plot(M.median, U.median, pch = 16, xlab = "Median M intensity", ylab = "Median U intensity", col = rainbow(nlevels(plotfactor))[factor(plotfactor)], main="Scatter plot of Signal Intensities coloured by Race")
-par(xpd=TRUE)
-legend("topright", levels(factor(plotfactor)), col = rainbow(nlevels(plotfactor)), pch = 10, cex=0.5)
-}
-
-##Colourefd by Tisssue type
-if(!is.na(SampleSheet[1,"Tissue_Type"])){
-plotfactor<-factor(SampleSheet$Tissue_Type, levels=c(unique(SampleSheet$Tissue_Type)))
-par(mfrow = c(1,1))
-plot(M.median, U.median, pch = 16, xlab = "Median M intensity", ylab = "Median U intensity", col = rainbow(nlevels(plotfactor))[factor(plotfactor)], main="Scatter plot of Signal Intensities coloured by Tissue Type")
-par(xpd=TRUE)
-legend("topright", levels(factor(plotfactor)), col = rainbow(nlevels(plotfactor)), pch = 10, cex=0.5)
-}
 
 ##Coloured by Organ
-if(!is.na(SampleSheet[1,"Organ"])){
 plotfactor<-factor(SampleSheet$Organ, levels=c(unique(SampleSheet$Organ)))
 par(mfrow = c(1,1))
 plot(M.median, U.median, pch = 16, xlab = "Median M intensity", ylab = "Median U intensity", col = rainbow(nlevels(plotfactor))[factor(plotfactor)], main="Scatter plot of Signal Intensities coloured by Organ")
 par(xpd=TRUE)
 legend("topright", levels(factor(plotfactor)), col = rainbow(nlevels(plotfactor)), pch = 10, cex=0.5)
-}
+
 
 ##Coloured by SentrixID
-if(!is.na(SampleSheet[1,"SentrixID"])){
 plotfactor<-factor(SampleSheet$SentrixID, levels=c(unique(SampleSheet$SentrixID)))
 par(mfrow = c(1,1))
 plot(M.median, U.median, pch = 16, xlab = "Median M intensity", ylab = "Median U intensity", col = rainbow(nlevels(plotfactor))[factor(plotfactor)], main="Scatter plot of Signal Intensities coloured by SentrixID")
 par(xpd=TRUE)
 legend("topright", levels(factor(plotfactor)), col = rainbow(nlevels(plotfactor)), pch = 10, cex=0.5)
-}
+
+##Coloured by Phenotype
+plotfactor<-factor(SampleSheet$Phenotype, levels=c(unique(SampleSheet$Phenotype)))
+par(mfrow = c(1,1))
+plot(M.median, U.median, pch = 16, xlab = "Median M intensity", ylab = "Median U intensity", col = rainbow(nlevels(plotfactor))[factor(plotfactor)], main="Scatter plot of Signal Intensities coloured by Phenotype")
+par(xpd=TRUE)
+legend("topright", levels(factor(plotfactor)), col = rainbow(nlevels(plotfactor)), pch = 10, cex=0.5)
+
+
 
 ```
 
@@ -259,11 +243,13 @@ for(plate in plates){
 }
 ```
 Intensities from the various control probes on the array are plotted to check the experiment has worked as expected. 
+
+
 ```{r Array statistics, echo= FALSE}
 
 ## Plotting control probes from fully methylated controls
-RGset_controls <- RGset[,which(RGset@colData@listData$Basename %in% meth_controls)]
-par(mfrow=c(1,1))
+RGset_controls <- RGset[,which(RGset@colData@listData$Basename %in% rownames(control))]
+par(mfrow=c(2,2))
 controlStripPlot(RGset_controls, controls = "BISULFITE CONVERSION I")
 controlStripPlot(RGset_controls, controls = "BISULFITE CONVERSION II")
 controlStripPlot(RGset_controls, controls = "EXTENSION")
@@ -281,7 +267,7 @@ controlStripPlot(RGset_controls, controls = "NORM_G")
 
 ```
 
-The fully methylated controls have their intensities logged, and saved to FullyMethylatedControlSamples.csv for cross-study comparisions of the scanner.
+The fully methylated controls have their intensities logged, and saved to ComparingFullyMethylatedControls.csv for cross-study comparisions of the scanner.
 
 ```{r removecontrols, include=FALSE}
 Previous_FMpheno <- read.csv("/mnt/data1/Array_Projects/Methylated_Controls/ComparingFullyMethylatedControls.csv")
@@ -292,13 +278,13 @@ Betas_meth_control <- betas[,SampleSheet$Control]
 # #we also want to manually find the time they were processed (this is the time stamp of the idats on the MDrive)
 meth_controls <- SampleSheet[SampleSheet$Control, c("Basename")]
 
-times<-SampleSheet[which(SampleSheet$Basename %in% meth_controls), c("Date_array_run", "Date_Bisulphite_con")]
+times<- SampleSheet[which(SampleSheet$Basename %in% rownames(control)), c("Date_array_run", "Date_Bisulphite_con")]
 
 # add some study info and save
 info<-data.frame(Study=rep(params$Name,nrow(FMpheno)), iDAT_Location=rep(idatPath, nrow(FMpheno)))
 FMpheno<-cbind(info, times, FMpheno)
 FMpheno <- rbind(Previous_FMpheno, FMpheno)
- write.csv(FMpheno, "/mnt/data1/Array_Projects/Methylated_Controls/ComparingFullyMethylatedControls.csv",row.names=FALSE)
+write.csv(FMpheno, "/mnt/data1/Array_Projects/Methylated_Controls/ComparingFullyMethylatedControls.csv",row.names=FALSE)
 
 
 #remove from all variables
@@ -326,7 +312,7 @@ Although signal intensity is the largest predictor of sample quality, the thresh
 
 ```{r}
 
-lowintensitysamples<-which(M.median < 1000 | U.median < 1000)
+lowintensitysamples<-which(M.median < 800 | U.median < 800)
 ```
 
 ```{r scatter500, echo=FALSE}
@@ -336,15 +322,16 @@ Intensity[lowintensitysamples] <-"LowIntensity"
 plotfactor<-as.factor(Intensity)
 
 plot(M.median, U.median, pch = 16, xlab = "Median M intensity", ylab = "Median U intensity", col=rainbow(2)[factor(plotfactor)])
-abline(v = 1000, col = "red")
-abline(h = 1000, col = "red")
+abline(v = 800, col = "red")
+abline(h = 800, col = "red")
 legend("topleft", levels(factor(plotfactor)), pch = 16, col = rainbow(2))
 ```
 
 
 ```{r updateQCmetrics1, include=FALSE}
+intensPASS <- M.median > 500
 SamplesFail[which(Intensity=="LowIntensity")]<-TRUE
-QCmetrics<-cbind(QCmetrics, Intensity)
+QCmetrics<-cbind(QCmetrics, Intensity, intensPASS)
 Step1<-c(sum(Intensity=="LowIntensity"),sum(SamplesFail))
 Stepsummary<-cbind(Stepsummary,Step1)
 ```
@@ -388,58 +375,44 @@ A principal component analysis of the methylation data can be used to predict th
 The principal components are calculated, and the two which correlate most with sex are found. These can be used to generate a scatter plot where the sexes are clearly separated.
 
 
-```{r definegenderfunction, include=FALSE}
-findGenderPC<-function(betas, sex, npcs = 20){
+```{r sex check, echo = FALSE}
 
-	betas.com<-betas[complete.cases(betas),]
-	pca<-prcomp(betas.com)
+GRset <- mapToGenome(RGset)
 
-	pca.cor<-rep(NA, npcs)
-	for(i in 1:npcs){
-		pca.cor[i]<-cor(pca$rotation[,i], as.numeric(as.factor(sex)), use = "complete")
-	}
-	top<-order(abs(pca.cor), decreasing = TRUE)[1]
-	second<-order(abs(pca.cor), decreasing = TRUE)[2]
-	print(paste("Top correlated principal components with sex:", top, ",", second))
-
-	predSex<-rep(NA, length(sex))
-	options.sex<-levels(as.factor(sex))
-
-	if(abs(pca.cor[top]) > 0.9){
-		print("Top PC has r > 0.9 with sex so good enough to confirm reported sexes")
-	} else {
-	  print(paste("Top PC has r =", round(abs(pca.cor[top]),2), "with sex so may not be good enough to confirm reported sexes"))
-	}
-
-	if(sign(pca.cor[top]) == 1){
-		predSex[which(pca$rotation[,top] < 0)]<-options.sex[1]
-		predSex[which(pca$rotation[,top] > 0)]<-options.sex[2]
-	} else {
-		predSex[which(pca$rotation[,top] < 0)]<-options.sex[2]
-		predSex[which(pca$rotation[,top] > 0)]<-options.sex[1]
-	}
-
-	plot(pca$rotation[,top], pca$rotation[,second], pch = 16, col = rainbow(3)[as.factor(sex)], xlab = paste("PC", top), ylab = paste("PC", second), main="PC Plot Coloured by Reported Sex")
-	legend("bottomright", levels(as.factor(sex)), pch = 16, col = rainbow(3))
-
-	#using mismatch to add labels to failed samples
-  #mismatch<-which(predSex!=sex)
-  #text(pca$rotation[mismatch,top], pca$rotation[mismatch, second], #labels=colnames(betas)[mismatch], cex=0.7, pos=4)
-
-	return(predSex)
+## check sex
+# idenitfy X chromosome probes
+if(!"PredictedSex" %in% colnames(QCmetrics)){	
+	x.probes <- which(seqnames(GRset) == "chrX")
+  y.probes <- which(seqnames(GRset) == "chrY")
+	ints.auto<-getMeth(GRset)[c(x.probes, y.probes),]+getUnmeth(GRset)[c(x.probes, y.probes),]
+	ints.X<-getMeth(GRset)[x.probes,]+getUnmeth(GRset)[x.probes,]
+	ints.Y<-getMeth(GRset)[y.probes,]+getUnmeth(GRset)[y.probes,]
+	x.cp<-colMeans(ints.X, na.rm = TRUE)/colMeans(ints.auto, na.rm = TRUE)
+	y.cp<-colMeans(ints.Y, na.rm = TRUE)/colMeans(ints.auto, na.rm = TRUE)
+	## base prediction on y chromosome
+	predSex.y<-rep(NA, length(y.cp))
+	predSex.y[which(y.cp > 1 & intensPASS == TRUE)]<-"M"
+	predSex.y[which(y.cp < 1 & intensPASS == TRUE)]<-"F"
+	## base prediction on x chromosome
+	predSex.x<-rep(NA, length(x.cp))
+	predSex.x[which(x.cp < 1 & intensPASS == TRUE)]<-"M"
+	predSex.x[which(x.cp > 1 & intensPASS == TRUE)]<-"F"
+	## check for consistent prediction
+	PredictedSex<-rep(NA, length(x.cp))
+	PredictedSex[which(predSex.x == predSex.y)]<-predSex.x[which(predSex.x == predSex.y)]
+	QCmetricsSex<-cbind(QCmetrics,x.cp,y.cp,predSex.x, predSex.y, PredictedSex)
 }
 
+plot(QCmetricsSex$x.cp, QCmetricsSex$y.cp, col = QCmetricsSex$Sex, xlab = "X chromosome", ylab = "Y chromosome", pch = 16)
+abline(v = 1)
+abline(h = 1, pch = 16)
 ```
 
-```{r predictsex, echo=FALSE}
-betas<-betas(msetEPIC)
-ReportedSex<-SampleSheet$Sex
-PredictedSex<-findGenderPC(betas,ReportedSex)
-```
 
-Here `r sum(PredictedSex!=ReportedSex, na.rm=T)` number of sampless predicted sex does not match their reported sex. These samples fail the QC according to the findGenderPC function and, and will be removed.
 
 ```{r updateQCmetrics3, include=FALSE}
+SampleSheet$Sex <- as.character(SampleSheet$Sex)
+ReportedSex<-SampleSheet$Sex
 QCmetrics<-cbind(QCmetrics, PredictedSex)
 QCmetrics$MismatchSex<-PredictedSex!=ReportedSex
 SamplesFail[which(PredictedSex!=ReportedSex)]<-TRUE
@@ -447,6 +420,77 @@ Step3<-c(length(which(PredictedSex!=ReportedSex)),sum(SamplesFail))
 Stepsummary<-cbind(Stepsummary,Step3)
 ```
 
+Here `r sum(PredictedSex!=ReportedSex, na.rm=T)` number of sampless predicted sex does not match their reported sex. These samples fail the QC according to the findGenderPC function and, and will be removed.
+
 ```{r Stepsummary3}
+print(Stepsummary)
+```
+
+
+##Age Prediction
+The age of samples can be predicted from their methylation data using Horvath's Coefficients and compared to the samples' reported ages. 
+
+However, this can be inaccurate and so it is used as a quality check and not as a reason to remove samples. Therefore, the following plot only contains samples which have passed the previous QC steps.
+
+```{r dnamage, echo=FALSE}
+
+QCmetrics$Age <- as.numeric(as.character(QCmetrics$Age))
+betas <- betas[,rownames(QCmetrics)]
+identical(rownames(QCmetrics), colnames(betas))
+PredictedAge<-agep(betas)
+ReportedAge<-QCmetrics$Age
+model<-lm(ReportedAge~PredictedAge)
+
+plot(PredictedAge[!SamplesFail], QCmetrics$Age[!SamplesFail], xlab = "Predicted", ylab = "Reported", main="Reported Age against Predicted Age", pch=16, col="purple")
+abline(model)
+QCmetrics<-cbind(QCmetrics, PredictedAge)
+
+cor.test(QCmetrics$Age, QCmetrics$PredictedAge)
+
+```
+
+
+## Check phenotype distribution across plate
+
+It is important for the study design to have equal distribution of phenotypes (e.g Case/Control, Sex).A Chisq to check that the phenotypes are spread randomly is summarised in the table, each value representing p.value.
+
+```{r plate design, warning=FALSE, echo=FALSE}
+QCmetrics$plate_row <- substring(QCmetrics$Plate_Location,1,1)
+QCmetrics$plate_col <- substring(QCmetrics$Plate_Location,2,3)
+plates = unique(QCmetrics$Plate)
+
+chisq_results <- matrix(NA, nrow = 4, ncol = length(plates))
+colnames(chisq_results) <- plates
+rownames(chisq_results) <- c('Sex_Row','Sex_Col','Case/Con_Row','Case/Con_Col')
+for (i in 1:length(plates)){
+  plate = plates[i]
+  QCmetricsplate <- QCmetrics[QCmetrics$Plate == plate, ]
+  QCmetricsplate$Sex <- as.character(QCmetricsplate$Sex)
+  #Sex by Row
+  tbl <- table(QCmetricsplate$Sex, QCmetricsplate$plate_row)
+  tbl_ch <- chisq.test(tbl)
+  chisq_results[1,i] <- signif(tbl_ch$p.value,3)
+  
+  #Sex by Col
+  tbl <- table(QCmetricsplate$Sex, QCmetricsplate$plate_col)
+  tbl_ch <- chisq.test(tbl)
+  chisq_results[2,i] <- signif(tbl_ch$p.value,3)
+  
+  #Pheno by Row
+  tbl <- table(QCmetricsplate$Phenotype, QCmetricsplate$plate_row)
+  tbl_ch <- chisq.test(tbl)
+  chisq_results[3,i] <- signif(tbl_ch$p.value,3)
+  
+  #Pheno by Col
+  tbl <- table(QCmetricsplate$Phenotype, QCmetricsplate$plate_col)
+  tbl_ch <- chisq.test(tbl)
+  chisq_results[4,i] <-  signif(tbl_ch$p.value,3)
+}
+chisq_results
+```
+
+From this technical QC, `r sum(SamplesFail)` samples have failedand `r sum(!SamplesFail)` samples have passed.
+
+```{r Stepsummary4}
 print(Stepsummary)
 ```

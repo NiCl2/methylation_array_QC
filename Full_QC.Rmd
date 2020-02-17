@@ -3,13 +3,14 @@ title: "Full Epic Array Quality Control"
 author: "G Neilson"
 output: html_document
 params: 
-  Name: Name_Of_Study
-  SampleSheet: SampleSheet.csv
-  PathToProjectFolder: /mnt/data1/Array_Projects/Dummy_Data/
-  Mset: Mset_Name.rdat 
-  RGset: RGset_Name.rdat
-  IntensityThreshold: 1000
-  Genotype: GenotypeTable.csv
+  Name: Portland
+  SampleSheet: Sample_Sheet_All.csv
+  PathToProjectFolder: /mnt/data1/Array_Projects/Portland_Samples/All
+  Mset: AllPortland_Mset.rdat 
+  RGset: AllPortland_RGset.rdat
+  IntensityThreshold: 800
+  Genotype: /mnt/data1/Array_Projects/Genetics/Portland/EPIC_SNPs_MSUmethylsamples.raw
+  fam: /mnt/data1/Array_Projects/Genetics/Portland/EPIC_SNPs_MSUmethylsamples.fam
   SamplesPassed: SamplesPassedQC.csv
   SamplesFailed: SamplesFailedQC.csv
   Normalised: Samples_Normalised.rdat
@@ -30,7 +31,6 @@ Samples are not removed after each QC step, but a record is kept of samples whic
 library(methylumi)
 library(wateRmelon)
 library(FlowSorted.Blood.EPIC)
-library(FlowSorted.DLPFC.EPIC)
 require(gdata)
 library(minfi)
 library(ggplot2)
@@ -70,7 +70,7 @@ if(file.exists(file=  params$Mset)){
   print(paste("Loading Mset:", params$Mset))
 } else {
 msetEPIC <- readEPIC(idatPath=idatPath, barcodes=SampleSheet$Basename, parallel = FALSE, force=T)
-save(msetEPIC, paste(params$PathToProjectFolder, params$Mset, sep = ""))
+save(msetEPIC, file = paste(params$PathToProjectFolder, params$Mset, sep = ""))
 print(paste("Mset created and saved as", params$Mset))
 }
 
@@ -79,26 +79,27 @@ if(file.exists(file= params$RGset)){
   print(paste("Loading RGset:", params$RGset))
 } else{
 RGset <- read.metharray.exp(base = idatPath, targets = SampleSheet, force = TRUE)
-save(RGset,paste(params$PathToProjectFolder, params$RGset, sep = ""))
+save(RGset, file = paste(params$PathToProjectFolder, params$RGset, sep = ""))
 print(paste("RGset created and saved as", params$RGset))
 }
+
 ```
 
 
 ###Study Information
 **Study:** `r params$Name`
 
-**Arrays ran by:** `r print(SampleSheet[1,"Name"])`, The University of Exeter Medical School
+**Arrays ran by:** `r SampleSheet[1,"Name_lab"]`, The University of Exeter Medical School
 
 **Array used:** Illumina EPIC microarray v1.0
 
-**QC done by:**`r print(SampleSheet[1,"Name_QC"])`, The University of Exeter Medical School
+**QC done by:**`r SampleSheet[1,"Name_QC"]`, The University of Exeter Medical School
 
 **Date of QC:** `r format(Sys.Date(), format="%d %B %Y")`
 
-**Sample ages:** `r range(SampleSheet$Age)`
+**Sample ages:** `r  range(SampleSheet$Age, na.rm = TRUE)`
 
-**Sample Tissue:** `r paste(SampleSheet[1,"Tissue_Type"])`
+**Sample Tissue:** `r unique(SampleSheet$Organ)`
 
 ##QC Information 
 
@@ -125,7 +126,7 @@ Stepsummary<-as.data.frame(matrix(ncol=0, nrow=2))
 rownames(Stepsummary)<-c("Failed This Step", "Total Failed")
 ```
 
-The phenotype file containing the sample information was loaded into R. Then the methylation data for the `r nrow(SampleSheet)` samples were loaded into a methylumiset. This contains `r nrow(SampleSheet[SampleSheet$Sample_ID != "Meth_control",])` `r params$Name` and `r nrow(SampleSheet[SampleSheet$Sample_ID == "Meth_control",])` fully methylated control samples.
+The phenotype file containing the sample information was loaded into R. Then the methylation data for the `r nrow(SampleSheet)` samples were loaded into a methylumiset. This contains `r nrow(SampleSheet[SampleSheet$Sample_ID != "Meth_Control",])` `r params$Name` and `r nrow(SampleSheet[SampleSheet$Sample_ID == "Meth_Control",])` fully methylated control samples.
 
 ##Check Signal Intensities
 The intensity check is the biggest indicator of sample quality. The median methylated signal intensity and unmethylated signal intensity for each sample is calculcated.
@@ -143,7 +144,7 @@ A histogram and scatter plot of the resulting data are plotted to visualise the 
 ```{r plotintensities, echo=FALSE}
 
 # coloured by institute
-if(!is.na(SampleSheet[1,"Institute"])){
+if(sum(!is.na(SampleSheet$Institute)) > length(unique(SampleSheet$Plate))){
 plotfactor<-factor(SampleSheet$Institute, levels=c(unique(SampleSheet$Institute))) 
 par(mfrow = c(1,2))
 hist(M.median, xlab = "Median M intensity", main="Histogram of Median Methylated Intensities", cex.main=0.7)
@@ -164,7 +165,7 @@ legend("topright", levels(factor(plotfactor)), col = rainbow(nlevels(plotfactor)
 }
 
 ##Coloured by Cell type
-if(!is.na(SampleSheet[1,"Cell_Type"])){
+if(sum(!is.na(SampleSheet$Cell_Type)) > length(unique(SampleSheet$Plate))){
 plotfactor<-factor(SampleSheet$Cell_Type, levels=c(unique(SampleSheet$Cell_Type)))
 par(mfrow = c(1,1))
 plot(M.median, U.median, pch = 16, xlab = "Median M intensity", ylab = "Median U intensity", col = rainbow(nlevels(plotfactor))[factor(plotfactor)], main="Scatter plot of Signal Intensities coloured by Cell Type")
@@ -173,8 +174,8 @@ legend("topright", levels(factor(plotfactor)), col = rainbow(nlevels(plotfactor)
 }
 
 ## Coloured By Race
-if(!is.na(SampleSheet[1,"Race"])){
-plotfactor<-factor(SampleSheet$Race, levels=c(unique(SampleSheet$Race)))
+if(sum(!is.na(SampleSheet$Ethnicity)) > length(unique(SampleSheet$Plate))){
+plotfactor<-factor(SampleSheet$Ethnicity, levels=c(unique(SampleSheet$Ethnicity)))
 par(mfrow = c(1,1))
 plot(M.median, U.median, pch = 16, xlab = "Median M intensity", ylab = "Median U intensity", col = rainbow(nlevels(plotfactor))[factor(plotfactor)], main="Scatter plot of Signal Intensities coloured by Race")
 par(xpd=TRUE)
@@ -182,7 +183,7 @@ legend("topright", levels(factor(plotfactor)), col = rainbow(nlevels(plotfactor)
 }
 
 ##Colourefd by Tisssue type
-if(!is.na(SampleSheet[1,"Tissue_Type"])){
+if(sum(!is.na(SampleSheet$Tissue_Type)) > length(unique(SampleSheet$Plate))){
 plotfactor<-factor(SampleSheet$Tissue_Type, levels=c(unique(SampleSheet$Tissue_Type)))
 par(mfrow = c(1,1))
 plot(M.median, U.median, pch = 16, xlab = "Median M intensity", ylab = "Median U intensity", col = rainbow(nlevels(plotfactor))[factor(plotfactor)], main="Scatter plot of Signal Intensities coloured by Tissue Type")
@@ -191,7 +192,7 @@ legend("topright", levels(factor(plotfactor)), col = rainbow(nlevels(plotfactor)
 }
 
 ##Coloured by Organ
-if(!is.na(SampleSheet[1,"Organ"])){
+if(sum(!is.na(SampleSheet$Organ)) > length(unique(SampleSheet$Plate))){
 plotfactor<-factor(SampleSheet$Organ, levels=c(unique(SampleSheet$Organ)))
 par(mfrow = c(1,1))
 plot(M.median, U.median, pch = 16, xlab = "Median M intensity", ylab = "Median U intensity", col = rainbow(nlevels(plotfactor))[factor(plotfactor)], main="Scatter plot of Signal Intensities coloured by Organ")
@@ -270,6 +271,12 @@ The heatmaps show that the signal intensities are generally high
 
 
 ```{r removecontrols, include=FALSE}
+identical(rownames(QCmetrics), colnames(RGset))
+RGset <- RGset[,order(colnames(RGset))]
+
+identical(rownames(QCmetrics), colnames(RGset))
+
+
 #remove from all variables
 M.median<-M.median[!SampleSheet$Control]
 U.median<-U.median[!SampleSheet$Control]
@@ -289,9 +296,10 @@ SamplesFail<-SamplesFail[!SampleSheet$Empty]
 QCmetrics<-QCmetrics[!SampleSheet$Empty,]
 SampleSheet<-SampleSheet[!SampleSheet$Empty,]
 
-save(msetEPIC, file =params$Mset)
-save(RGset, file =params$RGset)
-write.csv(SampleSheet, file = params$SampleSheet)
+# save(msetEPIC, file =params$Mset)
+# save(RGset, file =params$RGset)
+# write.csv(SampleSheet, file = params$SampleSheet)
+
 ```
 
 Although signal intensity is the largest predictor of sample quality, the threshold at which to exclude samples can vary from experiment to experiment - for example, signal intensities can vary slightly depending on tissue type or DNA extraction method. Samples which clearly deviate from the main cluster on the signal intensity plots should be removed. 
@@ -351,13 +359,6 @@ bisulphite_fail <- QCmetrics[SamplesFail,]
 print(Stepsummary)
 ```
 
-##Density Plot
-Density Plot of both probe types is plotted, you can see a clear bimodal distribution of the data
-```{r}
-MSet <- preprocessRaw(RGset)
-
-densityPlot(MSet)
-```
 
 ##Check Sex
 A principal component analysis of the methylation data can be used to predict the sex of the samples.
@@ -365,92 +366,60 @@ A principal component analysis of the methylation data can be used to predict th
 The principal components are calculated, and the two which correlate most with sex are found. These can be used to generate a scatter plot where the sexes are clearly separated.
 
 
-```{r definegenderfunction, include=FALSE}
-findGenderPC<-function(betas, sex, npcs = 20){
 
-	betas.com<-betas[complete.cases(betas),]
-	pca<-prcomp(betas.com)
+```{r sex check, echo = FALSE}
+QCmetrics <- QCmetrics[order(rownames(QCmetrics)),]
+RGset2 <- RGset[,order(colnames(RGset))]
 
-	pca.cor<-rep(NA, npcs)
-	for(i in 1:npcs){
-		pca.cor[i]<-cor(pca$rotation[,i], as.numeric(as.factor(sex)), use = "complete")
-	}
-	top<-order(abs(pca.cor), decreasing = TRUE)[1]
-	second<-order(abs(pca.cor), decreasing = TRUE)[2]
-	print(paste("Top correlated principal components with sex:", top, ",", second))
+identical(rownames(QCmetrics), colnames(RGset))
 
-	predSex<-rep(NA, length(sex))
-	options.sex<-levels(as.factor(sex))
+GRset <- mapToGenome(RGset)
 
-	if(abs(pca.cor[top]) > 0.9){
-		print("Top PC has r > 0.9 with sex so good enough to confirm reported sexes")
-	} else {
-	  print(paste("Top PC has r =", round(abs(pca.cor[top]),2), "with sex so may not be good enough to confirm reported sexes"))
-	}
+intensPASS <- M.median > 800
 
-	if(sign(pca.cor[top]) == 1){
-		predSex[which(pca$rotation[,top] < 0)]<-options.sex[1]
-		predSex[which(pca$rotation[,top] > 0)]<-options.sex[2]
-	} else {
-		predSex[which(pca$rotation[,top] < 0)]<-options.sex[2]
-		predSex[which(pca$rotation[,top] > 0)]<-options.sex[1]
-	}
+# QCmetrics<-cbind(QCmetrics,intensPASS)
 
-	plot(pca$rotation[,top], pca$rotation[,second], pch = 16, col = rainbow(3)[as.factor(sex)], xlab = paste("PC", top), ylab = paste("PC", second), main="PC Plot Coloured by Reported Sex")
-	legend("bottomright", levels(as.factor(sex)), pch = 16, col = rainbow(3))
 
-	#using mismatch to add labels to failed samples
-  #mismatch<-which(predSex!=sex)
-  #text(pca$rotation[mismatch,top], pca$rotation[mismatch, second], #labels=colnames(betas)[mismatch], cex=0.7, pos=4)
-
-	return(predSex)
+## check sex
+# idenitfy X chromosome probes
+if(!"PredictedSex" %in% colnames(QCmetrics)){	
+	x.probes <- which(seqnames(GRset) == "chrX")
+  y.probes <- which(seqnames(GRset) == "chrY")
+	ints.auto<-getMeth(GRset)[c(x.probes, y.probes),]+getUnmeth(GRset)[c(x.probes, y.probes),]
+	ints.X<-getMeth(GRset)[x.probes,]+getUnmeth(GRset)[x.probes,]
+	ints.Y<-getMeth(GRset)[y.probes,]+getUnmeth(GRset)[y.probes,]
+	x.cp<-colMeans(ints.X, na.rm = TRUE)/colMeans(ints.auto, na.rm = TRUE)
+	y.cp<-colMeans(ints.Y, na.rm = TRUE)/colMeans(ints.auto, na.rm = TRUE)
+	## base prediction on y chromosome
+	predSex.y<-rep(NA, length(y.cp))
+	predSex.y[which(y.cp > 1 & intensPASS == TRUE)]<-"M"
+	predSex.y[which(y.cp < 1 & intensPASS == TRUE)]<-"F"
+	## base prediction on x chromosome
+	predSex.x<-rep(NA, length(x.cp))
+	predSex.x[which(x.cp < 1 & intensPASS == TRUE)]<-"M"
+	predSex.x[which(x.cp > 1 & intensPASS == TRUE)]<-"F"
+	## check for consistent prediction
+	PredictedSex<-rep(NA, length(x.cp))
+	PredictedSex[which(predSex.x == predSex.y)]<-predSex.x[which(predSex.x == predSex.y)]
+	QCmetricsSex<-cbind(QCmetrics,x.cp,y.cp,predSex.x, predSex.y, PredictedSex)
 }
 
+plot(QCmetricsSex$x.cp, QCmetricsSex$y.cp, col = factor(QCmetricsSex$Sex), xlab = "X chromosome", ylab = "Y chromosome", pch = 16)
+abline(v = 1)
+abline(h = 1, pch = 16)
 ```
 
-```{r predictsex, echo=FALSE}
-betas<-betas(msetEPIC)
-ReportedSex<-SampleSheet$Sex
-PredictedSex<-findGenderPC(betas,ReportedSex)
-```
-
-Here `r sum(PredictedSex!=ReportedSex, na.rm=T)` number of sampless predicted sex does not match their reported sex. These samples fail the QC according to the findGenderPC function and, and will be removed.
-
-Sex check using minfi
-Sex was checked and a scatter graph of median X vs median Y was plotted
-```{r sex check minfi, warning = FALSE, echo = FALSE, message= FALSE}
-# RSet <- ratioConvert(MSet, what = "both", keepCN = TRUE)
-# GRset <- mapToGenome(RSet)
-# 
-# predictedSex1 <- getSex(GRset, cutoff = -2)
-# 
-# Sexplot_data <- as.data.frame(predictedSex1)
-# Sexplot_data <- Sexplot_data[order(row.names(Sexplot_data)),]
-# PredictedSex <-Sexplot_data$predictedSex
-# SampleSheet <- cbind(SampleSheet,PredictedSex)
-# 
-# #here we add the reported sex data 
-# Sexplot_data <- cbind(Sexplot_data, SampleSheet$Sex)
-# colnames(Sexplot_data)[colnames(Sexplot_data)=="SampleSheet$Sex"] <- "Reported Sex"
-# #replace blanks with NA
-# Sexplot_data$`Reported Sex`[Sexplot_data$`Reported Sex` == ""] <- "NA"
-# 
-# Sexplot <- ggplot(Sexplot_data, aes(Sexplot_data$xMed,Sexplot_data$yMed, 
-#                                     colour = Sexplot_data$`Reported Sex`)) +
-#                   geom_point() +
-#                   labs(x= "X Chr, median total intensity (log2)", 
-#                        y ="Y Chr, median total intensity (log2)", 
-#                        colour = "Reported Sex")
-# Sexplot
-```
 
 ```{r updateQCmetrics3, include=FALSE}
 QCmetrics<-cbind(QCmetrics, PredictedSex)
+ReportedSex <- as.character(QCmetrics$Sex)
 QCmetrics$MismatchSex<-PredictedSex!=ReportedSex
 SamplesFail[which(PredictedSex!=ReportedSex)]<-TRUE
 Step3<-c(length(which(PredictedSex!=ReportedSex)),sum(SamplesFail))
 Stepsummary<-cbind(Stepsummary,Step3)
 ```
+
+Here `r sum(PredictedSex!=ReportedSex, na.rm=T)` number of sampless predicted sex does not match their reported sex. These samples fail the QC according to the findGenderPC function and, and will be removed.
 
 ```{r Stepsummary3}
 print(Stepsummary)
@@ -461,9 +430,10 @@ If there is SNP data available the reported sex will be comapred to the sex pred
 
 If SNP data is not available this step will be ignored.
 
+
 ```{R check sex agaisnt genotype sex, echo=F}
 if(!is.na(SampleSheet[1,"DNA_IID"])){
-fam<-read.table("/gpfs/ts0/scratch/gn261/BDR/BDR_1_2_BrainID_DNA_ID.fam")
+fam<-read.table(params$fam)
 fam$V5[fam$V5==0]<-NA
 # (1 = male, 2 = female, 0 = unknown)
 # recode so that it matches the rest of the file for comparison 
@@ -471,7 +441,8 @@ fam$V5[fam$V5==1]<-"M"
 fam$V5[fam$V5==2]<-"F"
 
 ### match the datasets
-fam<-fam[match(QCmetrics$DNA_ID, fam$V1),]
+fam$V2 <- as.character(fam$V2)
+fam<-fam[match(QCmetrics$DNA_IID, fam$V2),]
 
 #### count mis matches between pheno and geno and predicted and geno 
 
@@ -486,31 +457,25 @@ QCmetrics$Mismatch_predicted_geno_SeX<-PredictedSex!= QCmetrics$geno_sex
 }
 ```
 
+
+
 ##Check Genotypes
 
-On the EPIC array there are 59 SNP probes. If  have SNP data is present, we can compare the methylation on these SNP probes to the samples' genotypes to confirm samples are from the expected individual.
+On the EPIC array there are 59 SNP probes. If  have SNP data is present, we can compare the methylation on these SNP probes to the samples genotypes to confirm samples are from the expected individual.
 
 If SNP data is not available this step will be ignored.
 
 ```{r load genotypes, echo=FALSE, message=FALSE}
-if(!is.na(SampleSheet[1,"DNA_IID"])){
+#Skip Genotyping if there are more than unique(plates) NA's. EG if there are three plates there should only be three NA's
+
 betas<-betas(msetEPIC)
 # load genotypes and match to betas
 
-geno<-read.table(params$Genotype, row.names=1, h=T)
+geno<-read.table(params$Genotype, row.names = 2, h=T) #The second row is where the samples are unique to individuals
 geno[,1:5]<-NULL
-genoOx<-geno[grep("BO", rownames(geno)),]
-genoOxID<-rownames(genoOx)
-
-DNA<-Sa$DNA_IID
-genoOv<-rownames(geno)
-overlap<-intersect(DNA, genoOv)
-
-
-ID<-SampleSheet[match(rownames(geno),SampleSheet$DNA_IID),]
-
-geno<-geno[match(SampleSheet$DNA_IID, rownames(geno)),]
-id<-geno[-which(rownames(geno) %in% SampleSheet$DNA_IID),]
+ID<-SampleSheet[match(rownames(geno),SampleSheet$DNA_IID),] #select samples from samplesheet that has genotype data
+geno<-geno[match(SampleSheet$DNA_IID, rownames(geno)),] #select genotype sample that have array data
+id<-geno[-which(rownames(geno) %in% SampleSheet$DNA_IID),] #geno samples which do not have array data
 
 
 
@@ -524,6 +489,7 @@ meth.sub<-betas[a,]
 
 identical(colnames(meth.sub), rownames(geno))
 identical(rownames(meth.sub), colnames(geno))
+
 
 #finding number of available genotypes for each sample
 nGenos<-rep(NA, length=nrow(SampleSheet))
@@ -550,17 +516,20 @@ par(mfrow=c(2,3))
 for (i in mismatchsamples){
 	plot(geno[,each], meth.sub[each,], xlab = "Genotype", ylab = "Methylation", main = rownames(meth.sub)[each], pch = 16, xlim = c(0,2), ylim = c(0,1), cex = 0.7)
 }
-}
+
 ```
 
-```{r ngenos}
+
+
+```{r ngenos, echo = FALSE, message = FALSE}
+if(!is.na(SampleSheet[1,"DNA_IID"])){
 print(table(nGenos))
+}
 
 ```
 
 
 ```{r check genotypes correlations, echo=FALSE, message=FALSE}
-if(!is.na(SampleSheet[1,"DNA_IID"])){
 #check genotypes correlation with methylation per sample
 GenoCor<-rep(NA, nrow(SampleSheet))
 for(i in 1:ncol(meth.sub)){
@@ -569,7 +538,7 @@ for(i in 1:ncol(meth.sub)){
 
 #plot histogram of correlations
 hist(GenoCor)
-}
+
 ```
 
 
@@ -612,16 +581,17 @@ This small number of probes means that only identical samples (such as samples f
 If your study is not a paired design this step will be skipped
 
 ```{r calculate snpCor, include=FALSE}
+
+
 betas<-betas(msetEPIC)
 betas.rs<-betas[grep("rs", rownames(betas)),]
 snpCor<-cor(betas.rs, use = "pairwise.complete.obs")
 for(i in 1:ncol(betas.rs)){
 	snpCor[i,i]<-NA
 }
-```
 
-
-```{r predictedduplicates, include=FALSE}
+if (length(unique(SampleSheet$Organ)) != 1){
+## Predict duplicates
 predictedduplicates<-vector(length = ncol(snpCor))
 for(i in 1:ncol(snpCor)){
   predictedduplicates[i]<-paste(names(which(snpCor[,i] > 0.8)), sep = "|", collapse = "|")
@@ -638,66 +608,57 @@ noDup<-subset(noDup, BrainID != singleID)
 write.csv(noDup, "BDR_samples_with_no_predicted_duplicates_but_should.csv", row.names=F)
 
 head(predictedduplicates)
-```
 
 
-
-```{r checkingbrainID, echo=FALSE}
-brain_IDs<-unique(SampleSheet$Individual_ID)
+# Check brain ID
+Individual_IDs<-unique(SampleSheet$Individual_ID)
 singles <- table(as.character(SampleSheet$Individual_ID))
 singleID <- names(singles[which(singles[] == 1)])
-brain_IDs<-setdiff(brain_IDs, singleID)
+Individual_IDs<-setdiff(Individual_IDs, singleID)
 minbrainIDcor<-NULL
 numbersamples<-NULL
 
 
-for (i in 1:length(brain_IDs)){
-  brainIDpair<-brain_IDs[i]
+for (i in 1:length(Individual_IDs)){
+  brainIDpair<-Individual_IDs[i]
   allbrainIDsamples<-which(SampleSheet$Individual_ID == brainIDpair)
   allcorrelations<-snpCor[allbrainIDsamples,allbrainIDsamples]
-  minbrainIDcor<-c(minbrainIDcor,min(allcorrelations, na.rm=TRUE))
+  minIndIDcor<-c(minIndIDcor,min(allcorrelations, na.rm=TRUE))
 }
-hist(minbrainIDcor, main="Minimum correlation in samples from the same brainID pair", xlab="Min Correlation")
+hist(minIndIDcor, main="Minimum correlation in samples from the same brainID pair", xlab="Min Correlation")
 
-```
-
-The histogram shows that `r sum(minbrainIDcor>0.8)` samples have a correlation > 0.8 with another sample. This suggests generally the correct samples have matched brain regions. `r sum(minbrainIDcor<0.8)` samples have correlations < 0.8 and fail the QC. However, this is predominatly due to samples having low signal intensity so it is not possible to match samples to their pair.
-
-
-```{r updateQCmetrics5, include=FALSE}
-
+#update QCmetrics
 #Brain_ID <- rep(brain_IDs, each = 2)
 minbrainID<-NULL
-minbrainID <- cbind(brain_IDs, minbrainIDcor)
+minbrainID <- cbind(brain_IDs, minIndIDcor)
 minbrainID <- as.data.frame(minbrainID)
 minbrainID$brain_IDs <- as.character(minbrainID$brain_IDs)
 
-minbrainID$minbrainIDcor <- as.character(minbrainID$minbrainIDcor)
-minbrainID$minbrainIDcor <- as.numeric(minbrainID$minbrainIDcor)
+minbrainID$minIndIDcor <- as.character(minbrainID$minIndIDcor)
+minbrainID$minIndIDcor <- as.numeric(minbrainID$minIndIDcor)
 
-QCmetrics$minbrainIDcor <- minbrainID$minbrainIDcor[match(QCmetrics$Brain_ID, minbrainID$brain_IDs)]
+QCmetrics$minIndIDcor <- minbrainID$minIndIDcor[match(QCmetrics$Brain_ID, minbrainID$brain_IDs)]
 
-SamplesFail[which(QCmetrics$minbrainIDcor< 0.8)]<-TRUE
-Step5<-c(sum(QCmetrics$minbrainIDcor < 0.8, na.rm=T), sum(SamplesFail)) 
+SamplesFail[which(QCmetrics$minIndIDcor< 0.8)]<-TRUE
+Step5<-c(sum(QCmetrics$minIndIDcor < 0.8, na.rm=T), sum(SamplesFail)) 
 Stepsummary<-cbind(Stepsummary,Step5)
-mindbrainIdpair<-subset(QCmetrics, minbrainIDcor < 0.8)
+mindbrainIdpair<-subset(QCmetrics, minIndIDcor < 0.8)
 
+print(Stepsummary) 
+} else {
+    print("No duplicates samples for individual")
+}
 ```
 
 
-
-```{r Stepsummary5}
-print(Stepsummary)
-
-``` 
 
 ###Checking samples from unrelated individuals
 Since we expect all correlations for samples from unrelated individuals to be low, for each sample, we can find its maximum correlation with any unrelated sample, and plot a histogram of the results.
 
 ```{r checkingunrelatedcor, echo=FALSE}
-brainIDs<-unique(SampleSheet$Individual_ID) 
+Individual_IDs<-unique(SampleSheet$Individual_ID) 
 unrelatedcors<-snpCor
-for (i in brainIDs){
+for (i in Individual_IDs){
   samples<-which(SampleSheet$Individual_ID == i)
   unrelatedcors[samples,samples]<-NA
 }
@@ -724,6 +685,8 @@ maxunrel<-QCmetrics[which(QCmetrics$maxunrelatedcors > 0.8),]
 print(Stepsummary)
 
 ``` 
+
+
 
 ##Age Prediction
 The age of samples can be predicted from their methylation data using Horvath's Coefficients and compared to the samples' reported ages. 
@@ -766,6 +729,7 @@ QCmetrics<-cbind(QCmetrics, SmokingScore)
 
 ```
 
+
 Smoking scores are added to the QC output and could be used as a covariate in later analyses if required or compared to samples reported smoking behaviours if provided.
 
 
@@ -780,9 +744,17 @@ If the percentage of probes with a detection p-value less than 0.05 is greater t
 
 Similarly, if the percentage of samples with a detection p-value less than 0.05 is greater than 1% for any probe, the probe is removed.
 
-```{r pfilterdefault}
+```{r pfilterdefault, echo = FALSE, message = FALSE}
 msetEPIC.pf <- pfilter(msetEPIC)
+
 save(msetEPIC.pf, file="msetEPIC_pf.rdat")
+
+if(file.exists(file=  "msetEPIC_pf.rdat")){
+  print("msetEPIC.pf exists")
+} else {
+save(msetEPIC, file = paste(params$PathToProjectFolder, params$Mset, sep = ""))
+print("msetEPIC.pf saved")
+}
 ```
 
 `r sum(!colnames(betas(msetEPIC)) %in% colnames(betas(msetEPIC.pf)))` out of `r nrow(SampleSheet)` samples fail the pfilter with these thresholds.
@@ -796,6 +768,8 @@ pFilterPass<-colnames(betas(msetEPIC)) %in% colnames(betas(msetEPIC.pf))
 
 QCmetrics<-cbind(QCmetrics,pFilterPass)
 SamplesFail[which(pFilterPass==FALSE)]<-TRUE
+
+#update QCmetrics and SamplesFailed
 Step7<-c(length(which(pFilterPass==FALSE)),sum(SamplesFail))
 Stepsummary<-cbind(Stepsummary,Step7)
 ```
@@ -811,8 +785,8 @@ The outlyx function in the wateRmelon package can be used to check if any of the
 
 
 ```{r outliers,include= FALSE}
+betas <- betas(msetEPIC)
 outliers <- outlyx(betas)
-
 
 QCmetrics <- cbind(QCmetrics, outliers$outliers)
 SamplesFail[which(outliers$outliers == TRUE)]<-TRUE
@@ -834,6 +808,7 @@ The methylation data for just the passed samples and probes is quantile normalis
 
 ```{r normalisation, include=FALSE}
 #this removes all the failed samples from the mset (pfiltered probes already removed)
+
 msetEPIC<-msetEPIC[,!SamplesFail]
  
 #save(msetEPIC, file = "mset_samples_removed.rdat")
@@ -894,8 +869,8 @@ plotmset_density<-function(mset, study=""){
 
 #The more samples in your mset the more messy these plots will look
 
-plotmset_density(msetEPIC, study="BDR")
-plotmset_density(msetEPIC.dasen, study="BDR Dasen")
+plotmset_density(msetEPIC, study="Raw data")
+plotmset_density(msetEPIC.dasen, study="Normalised Data")
 
 #double check dasen has not produced any values outside 0-1 (the number output is the number of samples that have any values outside 0-1)
 raw.weird<-sum(colSums(betas(msetEPIC) > 1 | betas(msetEPIC) <0, na.rm=T) > 0)
@@ -907,27 +882,6 @@ dasen.weird<-sum(colSums(betas(msetEPIC.dasen) > 1 | betas(msetEPIC.dasen) < 0) 
 
 The distributions generally look as we would expect, and dasen has not caused any samples to have beta values outside the expected 0-1 range. 
 
-
-##Re normalising after removing samples which fail normalisation violence 
-
-```{r Redo_Normalisation, echo=FALSE}
-
-msetEPIC<-msetEPIC[,!SamplesFail]
-#save(msetEPIC, file = "mset_samples_removed.rdat")
-
-
-msetEPIC.dasen_redo<-dasen(msetEPIC)
-save(msetEPIC.dasen_redo, file = "mset_dasen_redo.rdat")
-
-
-betas <- betas(msetEPIC)
-betas.dasen_redo <- betas(msetEPIC.dasen_redo)
-
-normv1 <- qual(betas, betas.dasen_redo)
-plot(normv1[,1:2], main = "Normalisation Violence redo")
-
-```
-
 There should be no points failing the second normalisation step as they will have been removed previously
 
 ##Cell Composition
@@ -935,10 +889,11 @@ DNA methylation varies between different cell types, and so the composition of c
 
 In order to estimate neuronal cell proportions in the brain we use an R package called CETS which was developed by  Guintivano, Aryee and Kaminsky (2013). They identified the top cell epigenotype specific (CETS) marks and developed a publically available R package, “CETS,” which is capable of quantifying neuronal proportions and generating neuronal profiles from DNA methylation data.
 
-```{r cellcomposition, include=FALSE}
+```{r cellcomposition, echo=FALSE}
 if(SampleSheet$Organ == "Blood"){
 #Making cell counts file using referance data set, this takes a while so has already been done
-counts <- estimateCellCounts(RGset[,!SamplesFail], compositeCellType ="Blood", cellTypes = c("CD8T","CD4T", "NK","Bcell","Mono","Gran"), referencePlatform = "IlluminaHumanMethylationEPIC", processMethod = "auto")
+counts <- estimateCellCounts(RGset[,!SamplesFail], compositeCellType ="Blood", cellTypes = c("CD8T","CD4T", "NK","Bcell","Mono","Gran"), 
+                             processMethod = "auto")
 save(counts, file="CellCounts.rdat")
 
 
@@ -948,18 +903,6 @@ boxplot(counts, use.cols=T, main="Boxplot of Estimated Cell Proportions in Prefr
 
 QCmetrics<-cbind(QCmetrics, counts)
 
-}else if(SampleSheet$Organ == "Brain") {
-  #Making cell counts file using referance data set, this takes a while so has already been done
-counts <- estimateCellCounts(RGset[,!SamplesFail], compositeCellType ="DLPFC", cellTypes = c("NeuN_neg","NeuN_pos"), referencePlatform = "IlluminaHumanMethylationEPIC", processMethod = "auto")
-save(counts, file="CellCounts.rdat")
-
-
-load("CellCounts.rdat")
-counts<-counts[match(SampleSheet$Basename, rownames(counts)),]
-boxplot(counts, use.cols=T, main="Boxplot of Estimated Cell Proportions in Prefrontal Cortex Samples")
-
-QCmetrics<-cbind(QCmetrics, counts)
-  
 }
 ```
 
@@ -979,7 +922,7 @@ write.csv(QCmetrics[SamplesFail,], params$SamplesFailed, row.names = F)
 write.csv(QCmetrics[!SamplesFail,], params$SamplesPassed, row.names = F)
 
 #filter probes from normalised betas
-betas<-betas(msetEPIC.dasen_redo)
+betas<-betas(msetEPIC.dasen)
 
 crosshyb<-read.table("/mnt/data1/EPIC_reference/CrossHydridisingProbes_McCartney.txt", stringsAsFactors = FALSE)
 snpProbes<-read.table("/mnt/data1/EPIC_reference/SNPProbes_McCartney.txt", stringsAsFactors = FALSE, header = TRUE)
@@ -991,7 +934,7 @@ betas<-betas[-grep("rs", rownames(betas)),]
 
 #only keeping the useful variables in SampleSheet
 SampleSheet<-QCmetrics[!SamplesFail,]
-SampleSheet<-subset(SampleSheet, select=-c(Control,PredictedSex,pFilterPass,outliers$outliers,predictedduplicates,GenoCor,Intensity,maxunrelatedcors))
+SampleSheet<-subset(SampleSheet, select=-c(Control,PredictedSex,pFilterPass,outliers$outliers,GenoCor,Intensity,maxunrelatedcors))
 
 betas<-betas[,match(SampleSheet$Basename, colnames(betas))]
 
