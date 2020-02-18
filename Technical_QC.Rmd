@@ -139,6 +139,7 @@ A histogram and scatter plot of the resulting data are plotted to visualise the 
 
 ```{r plotintensities, echo=FALSE}
 # coloured by institute
+if(sum(!is.na(SampleSheet$Institute)) > length(unique(SampleSheet$Plate))){
 plotfactor<-factor(SampleSheet$Institute, levels=c(unique(SampleSheet$Institute))) 
 par(mfrow = c(1,2))
 hist(M.median, xlab = "Median M intensity", main="Histogram of Median Methylated Intensities", cex.main=0.7)
@@ -147,6 +148,7 @@ par(mfrow = c(1,1))
 plot(M.median, U.median, pch = 16, xlab = "Median M intensity", ylab = "Median U intensity", col = rainbow(nlevels(plotfactor))[factor(plotfactor)], main="Scatter plot of Signal Intensities coloured by Institue")
 par(xpd=TRUE)
 legend("topright", levels(factor(plotfactor)), col = rainbow(nlevels(plotfactor)), pch = 10, cex=0.5)
+}
 
 #coloured by plate
 plotfactor<-factor(SampleSheet$Plate, levels=c(unique(SampleSheet$Plate)))
@@ -156,18 +158,32 @@ par(xpd=TRUE)
 legend("topright", levels(factor(plotfactor)), col = rainbow(nlevels(plotfactor)), pch = 10, cex=0.5)
 
 ## Coloured By Ethnicity
+if(sum(!is.na(SampleSheet$Ethnicity)) > length(unique(SampleSheet$Plate))){
 plotfactor<-factor(SampleSheet$Ethnicity, levels=c(unique(SampleSheet$Ethnicity)))
 par(mfrow = c(1,1))
 plot(M.median, U.median, pch = 16, xlab = "Median M intensity", ylab = "Median U intensity", col = rainbow(nlevels(plotfactor))[factor(plotfactor)], main="Scatter plot of Signal Intensities coloured by Ethnicity")
 par(xpd=TRUE)
 legend("topright", levels(factor(plotfactor)), col = rainbow(nlevels(plotfactor)), pch = 10, cex=0.5)
+}
 
 ##Coloured by Organ
+if(sum(!is.na(SampleSheet$Organ)) > length(unique(SampleSheet$Plate))){
 plotfactor<-factor(SampleSheet$Organ, levels=c(unique(SampleSheet$Organ)))
 par(mfrow = c(1,1))
 plot(M.median, U.median, pch = 16, xlab = "Median M intensity", ylab = "Median U intensity", col = rainbow(nlevels(plotfactor))[factor(plotfactor)], main="Scatter plot of Signal Intensities coloured by Organ")
 par(xpd=TRUE)
 legend("topright", levels(factor(plotfactor)), col = rainbow(nlevels(plotfactor)), pch = 10, cex=0.5)
+}
+
+##Coloured by Tissue
+if(sum(!is.na(SampleSheet$Tissue_Type)) > length(unique(SampleSheet$Plate))){
+plotfactor<-factor(SampleSheet$Tissue_Type, levels=c(unique(SampleSheet$Tissue_Type)))
+par(mfrow = c(1,1))
+plot(M.median, U.median, pch = 16, xlab = "Median M intensity", ylab = "Median U intensity", col = rainbow(nlevels(plotfactor))[factor(plotfactor)], main="Scatter plot of Signal Intensities coloured by Tissue")
+par(xpd=TRUE)
+legend("topright", levels(factor(plotfactor)), col = rainbow(nlevels(plotfactor)), pch = 10, cex=0.5)
+}
+
 
 
 ##Coloured by SentrixID
@@ -178,11 +194,13 @@ par(xpd=TRUE)
 legend("topright", levels(factor(plotfactor)), col = rainbow(nlevels(plotfactor)), pch = 10, cex=0.5)
 
 ##Coloured by Phenotype
+if(sum(!is.na(SampleSheet$Phenotype)) > length(unique(SampleSheet$Plate))){
 plotfactor<-factor(SampleSheet$Phenotype, levels=c(unique(SampleSheet$Phenotype)))
 par(mfrow = c(1,1))
 plot(M.median, U.median, pch = 16, xlab = "Median M intensity", ylab = "Median U intensity", col = rainbow(nlevels(plotfactor))[factor(plotfactor)], main="Scatter plot of Signal Intensities coloured by Phenotype")
 par(xpd=TRUE)
 legend("topright", levels(factor(plotfactor)), col = rainbow(nlevels(plotfactor)), pch = 10, cex=0.5)
+}
 
 
 
