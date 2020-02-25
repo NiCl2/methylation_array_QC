@@ -1,7 +1,12 @@
 ---
 title: "Technical QC" 
-author: "G Neilson"
-output: html_document
+output: 
+  html_document:
+    toc:true
+    toc_float:true
+	    includes:
+        before_body: /mnt/data1/Array_Projects/footer.html
+        after_body: /mnt/data1/Array_Projects/footer.html
 params: 
   Name: Portland_Batch2
   SampleSheet: Sample_Sheet_Batch2.csv
@@ -206,6 +211,7 @@ legend("topright", levels(factor(plotfactor)), col = rainbow(nlevels(plotfactor)
 
 ```
 
+###Heatmaps of plates
 The signal intensities are okay for these samples. 
  
 To further investigate the plates we can plot heatmaps of the intensities, shown below.
@@ -260,13 +266,16 @@ for(plate in plates){
   grid.arrange(plot1, plot2, legend, ncol=3, widths=c(3/7, 3/7, 1/7), top=paste("", plate))
 }
 ```
+
+###Control probe check
 Intensities from the various control probes on the array are plotted to check the experiment has worked as expected. 
 
 
 ```{r Array statistics, echo= FALSE}
 
 ## Plotting control probes from fully methylated controls
-RGset_controls <- RGset[,which(RGset@colData@listData$Basename %in% rownames(control))]
+Meth_controls <- SampleSheet[which(SampleSheet$Sample_ID == "Meth_Control"),]
+RGset_controls <- RGset[,which(RGset@colData@listData$Basename %in% Meth_controls$Basename)]
 par(mfrow=c(2,2))
 controlStripPlot(RGset_controls, controls = "BISULFITE CONVERSION I")
 controlStripPlot(RGset_controls, controls = "BISULFITE CONVERSION II")
@@ -326,6 +335,7 @@ SampleSheet<-SampleSheet[!SampleSheet$Empty,]
 
 ```
 
+###Removing Low Intensity Samples
 Although signal intensity is the largest predictor of sample quality, the threshold at which to exclude samples can vary from experiment to experiment - for example, signal intensities can vary slightly depending on tissue type or DNA extraction method. Samples which clearly deviate from the main cluster on the signal intensity plots should be removed. 
 
 ```{r}
@@ -468,7 +478,7 @@ cor.test(QCmetrics$Age, QCmetrics$PredictedAge)
 ```
 
 
-## Check phenotype distribution across plate
+##Check phenotype distribution across plate
 
 It is important for the study design to have equal distribution of phenotypes (e.g Case/Control, Sex).A Chisq to check that the phenotypes are spread randomly is summarised in the table, each value representing p.value.
 
