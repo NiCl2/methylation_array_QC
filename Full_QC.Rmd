@@ -4,8 +4,7 @@ output:
   html_document:
     toc: true
     toc_float: true
-		includes:
-        before_body: /mnt/data1/Array_Projects/footer.html
+    includes:
         after_body: /mnt/data1/Array_Projects/footer.html
 params: 
   Name: Portland
@@ -828,7 +827,6 @@ The outlyx function in the wateRmelon package can be used to check if any of the
 
 ```{r outliers,echo= FALSE}
 betas <- betas(msetEPIC)
-outlyx(betas)
 outliers <- outlyx(betas)
 QCmetrics <- cbind(QCmetrics, outliers$outliers)
 SamplesFail[which(outliers$outliers == TRUE)]<-TRUE
@@ -939,19 +937,23 @@ If your tissue is not blood, there is currently no appropriate algorithm to calc
 
 ```{r cellcomposition, echo=FALSE, warning= FALSE, message = FALSE}
 if(SampleSheet$Organ == "Blood"){
-#Making cell counts file using referance data set, this takes a while so has already been done
-counts <- estimateCellCounts(RGset[,!SamplesFail], compositeCellType ="Blood", cellTypes = c("CD8T","CD4T", "Bcell","Gran", "Mono","NK"), processMethod = "auto")
-save(counts, file="CellCounts.rdat")
-#load("/mnt/data1/Array_Projects/Portland_Samples/All/CellCounts.rdat")
+  if(file.exists(file=  "Cellcounts.rdat")){
+    print("Cell Counts exists and merge data together")
+    load("CellCounts.rdat")
+  } else {
+    counts <- estimateCellCounts(RGset[,!SamplesFail], compositeCellType ="Blood", cellTypes = c("CD8T","CD4T", "Bcell","Gran", "Mono","NK"), processMethod = "auto")
+    save(counts, file="CellCounts.rdat")
+    print("CellCount created and saved as CellCounts.rdat saved")
+  }
+
 counts<-counts[match(SampleSheet$Basename, rownames(counts)),]
- QCmetrics<-cbind(QCmetrics, counts)
+QCmetrics<-cbind(QCmetrics, counts)
 
 #Add cell density plots
 counts.m <- melt(counts,"colnames")
 i <- sapply(counts.m, is.factor) #gets rid of factos in data frame
 counts.m[i] <- lapply(counts.m[i], as.character)
 colnames(counts.m) <- c("Samples","Cell","Proportion")
-
 
 boxplot(counts, use.cols=T, main="Boxplot of Estimated Cell Proportions")
 
@@ -962,6 +964,7 @@ ggplot(counts.m, aes(x = Proportion)) +
          title = ("Cell Distribution")) +
     theme(panel.background = element_blank()) +
     scale_fill_brewer(palette = "Set1")
+
 
 }
 ```
