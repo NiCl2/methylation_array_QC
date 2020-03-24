@@ -12,7 +12,7 @@ params:
   PathToProjectFolder: /mnt/data1/Array_Projects/Portland_Samples/All
   Mset: AllPortland_Mset.rdat 
   RGset: AllPortland_RGset.rdat
-  IntensityThreshold: 750
+  IntensityThreshold: 800
   Genotype: /mnt/data1/Array_Projects/Portland_Samples/Genetics/EPIC_SNPs_MSUmethylsamples.raw
   fam: /mnt/data1/Array_Projects/Portland_Samples/Genetics/EPIC_SNPs_MSUmethylsamples.fam
   SamplesPassed: SamplesPassedQC.csv
@@ -554,10 +554,32 @@ if(exists('geno')){
 
 }
 
+## if any incongruent perform search for best
+## filter so only one observation of each indivudal in geno data
+genoToSearch<-match(unique(QCmetrics$Sample_ID),QCmetrics$Sample_ID)
+genoMatch<-rep(NA, nrow(QCmetrics))
+genoMatchVal<-rep(NA, nrow(QCmetrics))
+for(i in 1:ncol(meth.sub)){
+  if(intensPASS[i] == TRUE){
+    corVals<-rep(NA, nrow(geno))
+    for(j in genoToSearch){
+      if(!is.na(geno[j,1])){
+        corVals[j]<-cor(as.numeric(geno[j,]), meth.sub[,i], use = "pairwise.complete.obs")
+      }
+    }
+    if(max(corVals, na.rm = TRUE) > 0.8){ ## NB threshold to say 
+      genoMatch[i]<-as.character(QCmetrics$Sample_ID)[which(corVals > 0.8)]
+      genoMatchVal[i]<-max(corVals, na.rm = TRUE)
+    }
+  }
+}
+
+QCmetrics<-cbind(QCmetrics,genoMatchVal, genoMatch)
   #plot histogram of correlations
   hist(GenoCor)
 
 ```
+
 
 A failed sample is where the methyaltion and genotype correlation is low for a SNP, an example is provided here below.
 
@@ -1017,4 +1039,10 @@ if(print(identical(rownames(SampleSheet), colnames(betas)))==TRUE){
 ```
 
 The final dataset contains `r nrow(SampleSheet)` samples and `r nrow(betas)` probes.
+
+When including this stage in your methods the lab protocal that was undertaken is as follows
+
+500ng of DNA from each sample was treated with sodium bisulfite, using the EZ-96 DNAm-Gold kit (Zymo Research, CA, USA). DNAm was quantified using the Illumina Infinium HumanMethylationEPIC BeadChip (Illumina Inc, CA, USA) run on an Illumina iScan System (Illumina, CA, USA) using the manufacturers’ standard protocol.
+
+
 
