@@ -1,18 +1,22 @@
 ---
 title: "Technical QC" 
+author: "G Neilson"
 output: 
   html_document:
-    toc:true
-    toc_float:true
-	    includes:
-        before_body: /mnt/data1/Array_Projects/footer.html
-        after_body: /mnt/data1/Array_Projects/footer.html
+    toc: true
+    toc_float: true
+  includes:
+    before_body: /mnt/data1/Array_Projects/footer.html
+    after_body: /mnt/data1/Array_Projects/footer.html
+  
 params: 
-  Name: Portland_Batch2
-  SampleSheet: Sample_Sheet_Batch2.csv
-  PathToProjectFolder: /mnt/data1/Array_Projects/Portland_Samples/Batch2
-  Mset: Batch2Portland_Mset.rdat
-  RGset: Batch2Portland_RGset.rdat
+  Name: Understanding Society Batch8
+  SampleSheet: Understanding_Soc_SampleSheet_Batch8.csv
+  PathToProjectFolder: /mnt/data1/Array_Projects/Understanding_Soc/Batch8/
+  fam : /mnt/data1/Array_Projects/Understanding_Soc/Genetics/Understanding_Soc_genotypes.fam
+  Genotype: /mnt/data1/Array_Projects/Understanding_Soc/Genetics/Understanding_Soc_genotypes.txt
+  Mset: Understanding_Soc_batch7_Mset.rdat
+  RGset: Understanding_Soc_batch7_RGset.rdat
 ---
 
 ```{r setup, include=FALSE}
@@ -33,6 +37,7 @@ library(wateRmelon)
 require(gdata)
 library(minfi)
 library(ggplot2)
+library(gplots) 
 library(gdata)
 require(gridExtra)
 require(IlluminaHumanMethylationEPICmanifest)
@@ -180,16 +185,6 @@ par(xpd=TRUE)
 legend("topright", levels(factor(plotfactor)), col = rainbow(nlevels(plotfactor)), pch = 10, cex=0.5)
 }
 
-##Coloured by Tissue
-if(sum(!is.na(SampleSheet$Tissue_Type)) > length(unique(SampleSheet$Plate))){
-plotfactor<-factor(SampleSheet$Tissue_Type, levels=c(unique(SampleSheet$Tissue_Type)))
-par(mfrow = c(1,1))
-plot(M.median, U.median, pch = 16, xlab = "Median M intensity", ylab = "Median U intensity", col = rainbow(nlevels(plotfactor))[factor(plotfactor)], main="Scatter plot of Signal Intensities coloured by Tissue")
-par(xpd=TRUE)
-legend("topright", levels(factor(plotfactor)), col = rainbow(nlevels(plotfactor)), pch = 10, cex=0.5)
-}
-
-
 
 ##Coloured by SentrixID
 plotfactor<-factor(SampleSheet$SentrixID, levels=c(unique(SampleSheet$SentrixID)))
@@ -199,7 +194,7 @@ par(xpd=TRUE)
 legend("topright", levels(factor(plotfactor)), col = rainbow(nlevels(plotfactor)), pch = 10, cex=0.5)
 
 ##Coloured by Phenotype
-if(sum(!is.na(SampleSheet$Phenotype)) > length(unique(SampleSheet$Plate))){
+if(sum(!is.na(SampleSheet$Phenotype)) > length(unique(SampleSheet$Phenotype))){
 plotfactor<-factor(SampleSheet$Phenotype, levels=c(unique(SampleSheet$Phenotype)))
 par(mfrow = c(1,1))
 plot(M.median, U.median, pch = 16, xlab = "Median M intensity", ylab = "Median U intensity", col = rainbow(nlevels(plotfactor))[factor(plotfactor)], main="Scatter plot of Signal Intensities coloured by Phenotype")
@@ -211,9 +206,9 @@ legend("topright", levels(factor(plotfactor)), col = rainbow(nlevels(plotfactor)
 
 ```
 
-###Heatmaps of plates
 The signal intensities are okay for these samples. 
  
+## Heatmaps of Intensity 
 To further investigate the plates we can plot heatmaps of the intensities, shown below.
 
 ```{r intensityheatmap, echo=FALSE}
@@ -266,10 +261,41 @@ for(plate in plates){
   grid.arrange(plot1, plot2, legend, ncol=3, widths=c(3/7, 3/7, 1/7), top=paste("", plate))
 }
 ```
+```{r heatmap of Meth and unmeth ratios, echo= FALSE}
+QCmetrics$ratio <- QCmetrics$M.median - QCmetrics$U.median
 
-###Control probe check
+for(plate in plates){
+  samples<-QCmetrics[which(QCmetrics$Plate == plate),]
+  control<-samples[samples$Control,]
+
+  plateHeatmap <- ggplot(data=samples, aes(x=Position, y=SentrixID)) +
+    scale_fill_gradientn(colours=colorRamps::matlab.like(100), limits=c(min(QCmetrics$ratio),max(QCmetrics$ratio))) +
+    labs(x="", y="") +
+    theme_minimal() + 
+    coord_equal() +
+    theme(plot.title = element_text(hjust = 0.5), axis.text.x = element_text(angle = 90, hjust=1))
+  
+    plot3 <- plateHeatmap +
+    ggtitle("Ratio of median methylated and median unmethylated Intensity") +
+    geom_tile(aes(fill=ratio), colour = "white") +
+    geom_point(data=control, aes(x=control$Position, y=control$SentrixID)) +
+    theme(legend.position = "none")
+
+  legendplot<-plateHeatmap + 
+    geom_tile(aes(fill=U.median), colour = "white") +
+    labs(fill="Intensity", alpha="Control") +
+    geom_point(data=control, aes(x=control$Position, y=control$SentrixID, alpha=control$Control)) +
+    scale_alpha_manual(values=c(1,1,1)) + 
+    guides(alpha = guide_legend(override.aes = list(colour="black", pch=16)))
+    
+  legend<-g_legend(legendplot)
+  
+  grid.arrange(plot3, legend, ncol=2, widths=c(6/7, 1/7), top=paste("", plate))
+}
+```
+
 Intensities from the various control probes on the array are plotted to check the experiment has worked as expected. 
-
+##Control Probe Check
 
 ```{r Array statistics, echo= FALSE}
 
@@ -335,8 +361,9 @@ SampleSheet<-SampleSheet[!SampleSheet$Empty,]
 
 ```
 
-###Removing Low Intensity Samples
 Although signal intensity is the largest predictor of sample quality, the threshold at which to exclude samples can vary from experiment to experiment - for example, signal intensities can vary slightly depending on tissue type or DNA extraction method. Samples which clearly deviate from the main cluster on the signal intensity plots should be removed. 
+
+## Remove Low Intensity Samples
 
 ```{r}
 
@@ -407,41 +434,31 @@ The principal components are calculated, and the two which correlate most with s
 
 GRset <- mapToGenome(RGset)
 
-## check sex
-# idenitfy X chromosome probes
-if(!"PredictedSex" %in% colnames(QCmetrics)){	
-	x.probes <- which(seqnames(GRset) == "chrX")
-  y.probes <- which(seqnames(GRset) == "chrY")
-	ints.auto<-getMeth(GRset)[c(x.probes, y.probes),]+getUnmeth(GRset)[c(x.probes, y.probes),]
-	ints.X<-getMeth(GRset)[x.probes,]+getUnmeth(GRset)[x.probes,]
-	ints.Y<-getMeth(GRset)[y.probes,]+getUnmeth(GRset)[y.probes,]
-	x.cp<-colMeans(ints.X, na.rm = TRUE)/colMeans(ints.auto, na.rm = TRUE)
-	y.cp<-colMeans(ints.Y, na.rm = TRUE)/colMeans(ints.auto, na.rm = TRUE)
-	## base prediction on y chromosome
-	predSex.y<-rep(NA, length(y.cp))
-	predSex.y[which(y.cp > 1 & intensPASS == TRUE)]<-"M"
-	predSex.y[which(y.cp < 1 & intensPASS == TRUE)]<-"F"
-	## base prediction on x chromosome
-	predSex.x<-rep(NA, length(x.cp))
-	predSex.x[which(x.cp < 1 & intensPASS == TRUE)]<-"M"
-	predSex.x[which(x.cp > 1 & intensPASS == TRUE)]<-"F"
-	## check for consistent prediction
-	PredictedSex<-rep(NA, length(x.cp))
-	PredictedSex[which(predSex.x == predSex.y)]<-predSex.x[which(predSex.x == predSex.y)]
-	QCmetricsSex<-cbind(QCmetrics,x.cp,y.cp,predSex.x, predSex.y, PredictedSex)
-}
 
-plot(QCmetricsSex$x.cp, QCmetricsSex$y.cp, col = QCmetricsSex$Sex, xlab = "X chromosome", ylab = "Y chromosome", pch = 16)
-abline(v = 1)
-abline(h = 1, pch = 16)
+predictedSex1 <- getSex(GRset, cutoff = -2)
+
+Sexplot_data <- as.data.frame(predictedSex1)
+Sexplot_data <- Sexplot_data[order(row.names(Sexplot_data)),]
+PredictedSex <-Sexplot_data$predictedSex
+QCmetrics <- cbind(QCmetrics,PredictedSex)
+
+#here we add the reported sex data
+Sexplot_data <- cbind(Sexplot_data, QCmetrics$Sex)
+colnames(Sexplot_data)[colnames(Sexplot_data)=="QCmetrics$Sex"] <- "Reported Sex"
+#replace blanks with NA
+Sexplot_data$`Reported Sex`[Sexplot_data$`Reported Sex` == ""] <- "NA"
+
+ggplot(Sexplot_data, aes(Sexplot_data$xMed,Sexplot_data$yMed,
+                                    colour = Sexplot_data$`Reported Sex`)) +
+                  geom_point() +
+                  labs(x= "X Chr, median total intensity (log2)",
+                       y ="Y Chr, median total intensity (log2)",
+                       colour = "Reported Sex")
 ```
 
 
-
 ```{r updateQCmetrics3, include=FALSE}
-SampleSheet$Sex <- as.character(SampleSheet$Sex)
-ReportedSex<-SampleSheet$Sex
-QCmetrics<-cbind(QCmetrics, PredictedSex)
+ReportedSex <- as.character(QCmetrics$Sex)
 QCmetrics$MismatchSex<-PredictedSex!=ReportedSex
 SamplesFail[which(PredictedSex!=ReportedSex)]<-TRUE
 Step3<-c(length(which(PredictedSex!=ReportedSex)),sum(SamplesFail))
@@ -477,8 +494,24 @@ cor.test(QCmetrics$Age, QCmetrics$PredictedAge)
 
 ```
 
+##Tissue Prediction
+```{r packages, include=FALSE}
+library(glmnet)
+```
 
-##Check phenotype distribution across plate
+```{r Tissue Prediction, echo =FALSE, message=FALSE, results= 'hide'}
+#load function 
+source("/mnt/data1/Array_Projects/Tissue_Predictor/Tissue_predictor_function.R")
+
+QCmetrics <- tissue_predictor(QCmetrics, msetEPIC)
+ggplot(data = QCmetrics, aes(x=Organ, fill= Predicted_Tissue))+
+  geom_bar( position= position_dodge())+
+  labs(x = "Reported Tissue", fill= "Predicted Tissue")
+  theme_minimal() 
+
+```
+
+## Check phenotype distribution across plate
 
 It is important for the study design to have equal distribution of phenotypes (e.g Case/Control, Sex).A Chisq to check that the phenotypes are spread randomly is summarised in the table, each value representing p.value.
 
@@ -504,15 +537,6 @@ for (i in 1:length(plates)){
   tbl_ch <- chisq.test(tbl)
   chisq_results[2,i] <- signif(tbl_ch$p.value,3)
   
-  #Pheno by Row
-  tbl <- table(QCmetricsplate$Phenotype, QCmetricsplate$plate_row)
-  tbl_ch <- chisq.test(tbl)
-  chisq_results[3,i] <- signif(tbl_ch$p.value,3)
-  
-  #Pheno by Col
-  tbl <- table(QCmetricsplate$Phenotype, QCmetricsplate$plate_col)
-  tbl_ch <- chisq.test(tbl)
-  chisq_results[4,i] <-  signif(tbl_ch$p.value,3)
 }
 chisq_results
 ```
@@ -521,4 +545,328 @@ From this technical QC, `r sum(SamplesFail)` samples have failedand `r sum(!Samp
 
 ```{r Stepsummary4}
 print(Stepsummary)
+```
+
+
+##Genotype Sex Check
+If there is SNP data available the reported sex will be comapred to the sex predicted using the SNP data and samples which do not match will be removed. 
+
+If SNP data is not available this step will be ignored.
+
+
+```{R check sex agaisnt genotype sex, echo=F}
+
+fam<-read.table(params$fam)
+fam$V5[fam$V5==0]<-NA
+# (1 = male, 2 = female, 0 = unknown)
+# recode so that it matches the rest of the file for comparison 
+fam$V5[fam$V5==1]<-"M"
+fam$V5[fam$V5==2]<-"F"
+
+### match the datasets
+fam$V2 <- as.character(fam$V2)
+fam<-fam[match(QCmetrics$Sample_ID, fam$V2),]
+
+#### count mis matches between pheno and geno and predicted and geno 
+
+MMpred<-fam[which(fam$V5 != PredictedSex),] ## 19
+MMpheno<-fam[which(fam$V5 != ReportedSex),] ## 14
+overlapMM<-MMpred[which(MMpred$V1 %in% MMpheno$V1),] ## 8 
+
+QCmetrics<-cbind(QCmetrics, geno_sex=fam$V5)
+QCmetrics$geno_sex[QCmetrics$geno_sex==0]<-NA
+QCmetrics$Mismatch_pheno_geno_Sex<-ReportedSex!= QCmetrics$geno_sex
+QCmetrics$Mismatch_predicted_geno_SeX<-PredictedSex!= QCmetrics$geno_sex
+
+```
+
+
+##Check Genotypes
+
+On the EPIC array there are 59 SNP probes. If  have SNP data is present, we can compare the methylation on these SNP probes to the samples genotypes to confirm samples are from the expected individual.
+
+If SNP data is not available this step will be ignored.
+
+```{r load genotypes, echo=FALSE, message=FALSE}
+#Skip Genotyping if there are more than unique(plates) NA's. EG if there are three plates there should only be three NA's. If more than three NA's in the DNA_IID column assumption is made that there are no genotyping data available. 
+
+
+betas<-betas(msetEPIC)
+# load genotypes and match to betas
+
+geno<-read.table(params$Genotype, row.names = 1,  h=T) #The second row is where the samples are unique to individuals
+
+ID<-SampleSheet[match(rownames(geno),SampleSheet$Sample_ID),] #select samples from samplesheet that has genotype data
+geno<-geno[match(SampleSheet$Sample_ID, rownames(geno)),] #select genotype sample that have array data
+id<-geno[-which(rownames(geno) %in% SampleSheet$Sample_ID),] #geno samples which do not have array data
+
+
+
+a<-NULL
+for(i in 1:ncol(geno)){
+	snp<-unlist(strsplit(colnames(geno)[i], "_"))[1]
+	a<-append(a, grep(snp, rownames(betas)))
+}
+
+meth.sub<-betas[a,]
+
+
+
+#finding number of available genotypes for each sample
+nGenos<-rep(NA, length=nrow(SampleSheet))
+for(i in 1:nrow(SampleSheet)){
+  nGenos[i]<-sum(!is.na(geno[i,]))
+}
+
+# first check direction of minor alleles
+cors<-vector(length = length(a))
+par(mfrow=c(2,3))
+for(each in 1:nrow(meth.sub)){
+	cors[each]<-cor(geno[,each], meth.sub[each,], use = "pairwise.complete.obs")
+	plot(geno[,each], meth.sub[each,], xlab = "Genotype", ylab = "Methylation", main = rownames(meth.sub)[each], pch = 16, xlim = c(0,2), ylim = c(0,1), cex = 0.7)
+}
+
+# change minor allele in genotype data if negative correlation
+for(each in which(cors < 0)){
+	geno[,each]<-(2-geno[,each])
+}
+
+#samples which seem incorrect
+mismatchsamples<-which(cors<0.8)
+par(mfrow=c(2,3))
+for (i in mismatchsamples){
+	plot(geno[,each], meth.sub[each,], xlab = "Genotype", ylab = "Methylation", main = rownames(meth.sub)[each], pch = 16, xlim = c(0,2), ylim = c(0,1), cex = 0.7)
+}
+
+```
+
+To ensure that the correct samples are loaded onto the EPIC array and that it matches their genotyping information, we will calculate the correlation between SNPs on the EPIC array and on the genotyping array. Correlation values lower than 0.8 suggests that the samples from the methylation and genotyping do not match. These samples will need to be further investigated to understanding what issues may have risen such as mislabelling samples or sample switch on either arrays. 
+First, we will check the number of SNPs that individuals share between the EPIC and the genotyping array. The SNPs on the DNAm array and the SNPs on the genotyping array may not always match for all individuals, the table below is the summary for this study. 
+
+```{r ngenos, echo = FALSE, message = FALSE}
+if(exists('nGenos')){
+tblnGenos <- as.data.frame(table(nGenos))
+tblnGenos$nGenos <- as.numeric(as.character(tblnGenos$nGenos))
+tblnGenos <- t(tblnGenos)
+rownames(tblnGenos) <- c('Snps shared between\nDNAm array & SNP array',
+                         'Number of samples')
+grid.table(tblnGenos)
+} else {
+  print('No Genotype data to compare snps on DNAm array and SNP array')
+}
+
+```
+
+
+Now we can check the correlation between the methylation and genotyped samples.
+
+```{r check genotypes correlations, echo=FALSE, message=FALSE}
+if(exists('geno')){
+  #check genotypes correlation with methylation per sample
+  GenoCor<-rep(NA, nrow(SampleSheet))
+  for(i in 1:ncol(meth.sub)){
+    GenoCor[i]<-cor(as.numeric(geno[i,]), meth.sub[,i], use = "pairwise.complete.obs")
+  }
+
+}
+
+## if any incongruent perform search for best
+## filter so only one observation of each indivudal in geno data
+genoToSearch<-match(unique(QCmetrics$Sample_ID),QCmetrics$Sample_ID)
+genoMatch<-rep(NA, nrow(QCmetrics))
+genoMatchVal<-rep(NA, nrow(QCmetrics))
+for(i in 1:ncol(meth.sub)){
+  if(intensPASS[i] == TRUE){
+    corVals<-rep(NA, nrow(geno))
+    for(j in genoToSearch){
+      if(!is.na(geno[j,1])){
+        corVals[j]<-cor(as.numeric(geno[j,]), meth.sub[,i], use = "pairwise.complete.obs")
+      }
+    }
+    if(max(corVals, na.rm = TRUE) > 0.8){ ## NB threshold to say 
+      genoMatch[i]<-as.character(QCmetrics$Sample_ID)[which(corVals > 0.8)]
+      genoMatchVal[i]<-max(corVals, na.rm = TRUE)
+    }
+  }
+}
+
+QCmetrics<-cbind(QCmetrics,genoMatchVal, genoMatch)
+  #plot histogram of correlations
+  hist(GenoCor)
+
+```
+
+A failed sample is where the methyaltion and genotype correlation is low for a SNP, an example is provided here below.
+
+```{r examplefailedgenotypes, echo=FALSE, message=FALSE}
+
+par(mfrow=c(1,2))
+examples=c(which(GenoCor>0.8)[1],which(GenoCor<0.8)[1])
+titles=c("Passed Sample","Failed Sample")
+
+for (n in 1:2){
+i=examples[n]
+plot(as.numeric(geno[i,]), meth.sub[,i], main =titles[n], xlab = "Genotype", ylab = "Methylation", xlim = c(0,2), ylim = c(0,1), pch = 16)
+legend("topleft", legend=paste("r=",round(GenoCor[i],3)), bty="n")
+}
+
+```
+
+Of the `r nrow(SampleSheet)` samples, `r sum(is.na(SampleSheet$DNA_IID))` do not have genotype information available which overlap with the DNAm array geno SNPs. 
+
+Of the `r sum(!is.na(SampleSheet$DNA_IID))` which do, `r sum(GenoCor<0.8, na.rm=T)` have a correlation < 0.8 with their genotypes and fail the QC.
+
+```{r updateQCmetrics5, include=FALSE}
+QCmetrics<-cbind(QCmetrics, GenoCor)
+SamplesFail[which(GenoCor<0.8)]<-TRUE
+Step5<-c(sum(GenoCor<0.8, na.rm=T),sum(SamplesFail))
+Stepsummary<-cbind(Stepsummary,Step5)
+genocorr<-subset(QCmetrics, GenoCor < 0.8)
+```
+
+```{r Stepsummary5}
+print(Stepsummary)
+```
+
+##Genetic correlations
+
+The 59 SNP probes on the array can also be used to estimate genetic correlations between samples. 
+
+This small number of probes means that only identical samples (such as samples from the same individual, MZ twins, individual brainIDs or samples duplicated by error) can be identified and no lower proportion of genetic relatedness (such as siblings) can be inferred.
+
+If your study is not a paired design this step will be skipped
+
+```{r calculate snpCor, include=FALSE}
+
+
+betas<-betas(msetEPIC)
+betas.rs<-betas[grep("rs", rownames(betas)),]
+snpCor<-cor(betas.rs, use = "pairwise.complete.obs")
+for(i in 1:ncol(betas.rs)){
+	snpCor[i,i]<-NA
+}
+
+
+```
+
+
+
+###Checking samples from unrelated individuals
+This study design assumes that each sample is completely unqiue and that there should be no duplicates with any other sample. The SNPs on the DNAm array can be used to predicted that no sample correlates with another. For each sample, we can find its maximum correlation with any other sample, and plot a histogram of the results. Any samples with a threshold greater than 0.8 indicates that they are duplicates.
+
+```{r checkingunrelatedcor, echo=FALSE}
+Individual_IDs<-unique(SampleSheet$Individual_ID) 
+unrelatedcors<-snpCor
+for (i in Individual_IDs){
+  samples<-which(SampleSheet$Individual_ID == i)
+  unrelatedcors[samples,samples]<-NA
+}
+maxunrelatedcors<-apply(unrelatedcors, 1, max, na.rm = TRUE)
+
+hist(maxunrelatedcors, main="Maximum correlation in samples from unrelated individuals", xlab="Max Correlation")
+```
+
+
+`r length(which(maxunrelatedcors>0.8))` samples have a maximum correlation > 0.8 with another unrelated sample. 
+
+Sometimes samples are duplicates and we can check that there is also duplicates in the genotype data if necessary.
+
+
+```{r, echo=FALSE, message=FALSE}
+for (key in names(params)) {
+  do.call('Sys.setenv', params[key])
+}
+
+nodupsmeth <- length(rownames(as.matrix(which(maxunrelatedcors > 0.8, arr.ind = T))))
+```
+
+```{bash checkingenotyperelatedness, message=FALSE, echo = FALSE, include = FALSE}
+#if statement will only run below statement if there are duplicated samples in the methylation data
+
+echo $nodupsmeth
+
+if [$nodupsmeth -eq 0]
+then
+  echo No need to look at genotype duplication samples.
+else
+    #genoloc is where the genotype is and bed is the bed file name being extracted
+  genoloc=$(echo $Genotype | cut -f1-6 -d"/")
+  bed=$(echo $Genotype | cut -d"/" -f7 |   head -c -5)
+  
+  #check that the geno name is correct
+  echo $genoloc/$bed.bed
+  echo $genoloc/$bed.fam
+  echo $genoloc/$bed.bim
+  
+  #we copy over the bed files in CheckGEnoDuplicated file to run plink in
+  mkdir CheckGenoDuplicates
+  scp $genoloc/$bed.bed CheckGenoDuplicates
+  scp $genoloc/$bed.bim CheckGenoDuplicates
+  scp $genoloc/$bed.fam CheckGenoDuplicates
+  
+  cd CheckGenoDuplicates
+  plink2 --bfile  $genoloc/$bed --recode --tab --out  $genoloc/$bed_maps
+  plink2 --file  $genoloc/$bed_smaps --cluster --matrix
+fi
+```
+
+```{r genomatrix, echo = FALSE,warning = FALSE}
+if(length(which(maxunrelatedcors > 0.8, arr.ind = T)) != 0){
+mibs <- read.delim(paste(getwd(),"/CheckGenoDuplicates/plink.mibs", sep = ""), sep = "", header = F)
+mibsid <- read.delim(paste(getwd(),"/CheckGenoDuplicates/plink.mibs.id", sep = ""), sep = "", header = F)
+rownames(mibs) <- mibsid$V2
+colnames(mibs) <- mibsid$V2
+#Remove the 1's
+for (i in 1:nrow(mibs)){
+  mibs[i,i]<-NA
+}
+maxunrelatedgenocors<-apply(mibs, 1, max, na.rm = TRUE) #over each row
+hist(maxunrelatedgenocors, main="Maximum correlation in samples from individuals (SNPs)", xlab="Max Correlation")
+
+dupsgeno <- rownames(as.matrix(which(maxunrelatedgenocors > 0.9, arr.ind = T)))
+
+mibs2 <- mibs[dupsgeno,dupsgeno]
+
+
+mibs2 <- as.matrix(mibs2)
+heatmap.2(mibs2, trace = "none", key = FALSE, dendrogram = "column",
+          labRow =rownames(mibs2), labCol = colnames(mibs2), main = "Sample Duplicates (Genotype)", margin = c(10,10))
+print("These samples are also duplicates in the genotype data. However these samples will not be counted as fails.")
+}
+
+```
+
+```{r update QCmetrics6, include=FALSE}
+#To ensure that samples are truly duplicates we will check geno and methylation samples are also duplicates
+
+dupsmeth <- rownames(as.matrix(which(maxunrelatedcors > 0.8, arr.ind = T)))
+dupsmeth <- QCmetrics[which(QCmetrics$Basename %in% dupsmeth), "Sample_ID"]
+
+if(length(dupsmeth > 0)){
+QCmetrics<-cbind(QCmetrics,maxunrelatedcors)
+if(dupsmeth %in% dupsgeno){
+  print("These samples are duplicated")
+  Step6<-c(0,sum(SamplesFail))
+} else{
+  print("Samples not duplicated in geno and meth snps")
+  SamplesFail[which(maxunrelatedcors > 0.8)]<-TRUE
+  dup<-QCmetrics[which(QCmetrics$maxunrelatedcors > 0.8),]
+  write.csv(dup, paste(params$PathToProjectFolder, "duplicated_samples.csv",sep = ""), row.names=F)
+}
+
+Stepsummary<-cbind(Stepsummary,Step6)
+}
+
+```
+
+```{r Stepsummary6}
+print(Stepsummary)
+
+``` 
+
+```{r Samplespassed/ Failed}
+setwd(params$PathToProjectFolder)
+write.csv(QCmetrics[SamplesFail,], file = "SamplesFailed.csv", row.names = F)
+write.csv(QCmetrics[!SamplesFail,], file = "SamplesPassed.csv", row.names = F)
+
 ```

@@ -5,19 +5,20 @@ output:
     toc: true
     toc_float: true
     includes:
+        before_body: /mnt/data1/Array_Projects/footer.html
         after_body: /mnt/data1/Array_Projects/footer.html
 params: 
   Name: Portland
-  SampleSheet: Sample_Sheet_All.csv
-  PathToProjectFolder: /mnt/data1/Array_Projects/Portland_Samples/All
-  Mset: AllPortland_Mset.rdat 
-  RGset: AllPortland_RGset.rdat
-  IntensityThreshold: 800
+  SampleSheet: Portland_SampleSheet_All.csv
+  PathToProjectFolder: /mnt/data1/Array_Projects/Portland_Samples/All/
+  Mset: Portland_Mset.rdat 
+  RGset: Portland_RGset.rdat
+  IntensityThreshold: 750
   Genotype: /mnt/data1/Array_Projects/Portland_Samples/Genetics/EPIC_SNPs_MSUmethylsamples.raw
   fam: /mnt/data1/Array_Projects/Portland_Samples/Genetics/EPIC_SNPs_MSUmethylsamples.fam
   SamplesPassed: SamplesPassedQC.csv
   SamplesFailed: SamplesFailedQC.csv
-  Normalised: Samples_Normalised.rdat
+  Normalised: Portland_Blood_All_Samples_Normalised.rdat
   
 ---
 
@@ -40,6 +41,8 @@ library(minfi)
 library(ggplot2)
 library(gdata)
 require(gridExtra)
+library(glmnet)
+library(yarrr)
 require(IlluminaHumanMethylationEPICmanifest)
 library(tidyr)
 library(dplyr)
@@ -48,7 +51,7 @@ library(IlluminaHumanMethylationEPICanno.ilm10b2.hg19)
 
 setwd(params$PathToProjectFolder)
 
-SampleSheet<-read.csv(file = params$SampleSheet, stringsAsFactors = FALSE)
+SampleSheet<-read.csv(file = params$SampleSheet, stringsAsFactors = FALSE, sep = ",")
 SampleSheet$Sex <- as.factor(SampleSheet$Sex)
 
 rownames(SampleSheet) <- SampleSheet$Basename
@@ -223,6 +226,7 @@ The signal intensities are okay for these samples.
 To further investigate the plates we can plot heatmaps of the intensities, shown below.
 
 ```{r intensityheatmap, echo=FALSE}
+QCmetrics$ratio <- QCmetrics$M.median - QCmetrics$U.median
 QCmetrics$position<-factor(QCmetrics$Position)
 QCmetrics$SentrixID<-factor(QCmetrics$SentrixID, levels=rev(unique(QCmetrics$SentrixID))) #keeps the levels of the factor in current order rather than sorting numerically/alphabetically, also reverses this order as heatmaps plot bottom to top
 
@@ -272,6 +276,39 @@ for(plate in plates){
   grid.arrange(plot1, plot2, legend, ncol=3, widths=c(3/7, 3/7, 1/7), top=paste("", plate))
 }
 ```
+
+```{r heatmap of Meth and unmeth ratios, echo= FALSE}
+
+for(plate in plates){
+  samples<-QCmetrics[which(QCmetrics$Plate == plate),]
+  control<-samples[samples$Control,]
+
+  plateHeatmap <- ggplot(data=samples, aes(x=Position, y=SentrixID)) +
+    scale_fill_gradientn(colours=colorRamps::matlab.like(100), limits=c(min(QCmetrics$ratio),max(QCmetrics$ratio))) +
+    labs(x="", y="") +
+    theme_minimal() + 
+    coord_equal() +
+    theme(plot.title = element_text(hjust = 0.5), axis.text.x = element_text(angle = 90, hjust=1))
+  
+    plot3 <- plateHeatmap +
+    ggtitle("Ratio of median methylated and median unmethylated Intensity") +
+    geom_tile(aes(fill=ratio), colour = "white") +
+    geom_point(data=control, aes(x=control$Position, y=control$SentrixID)) +
+    theme(legend.position = "none")
+
+  legendplot<-plateHeatmap + 
+    geom_tile(aes(fill=U.median), colour = "white") +
+    labs(fill="Intensity", alpha="Control") +
+    geom_point(data=control, aes(x=control$Position, y=control$SentrixID, alpha=control$Control)) +
+    scale_alpha_manual(values=c(1,1,1)) + 
+    guides(alpha = guide_legend(override.aes = list(colour="black", pch=16)))
+    
+  legend<-g_legend(legendplot)
+  
+  grid.arrange(plot3, legend, ncol=2, widths=c(6/7, 1/7), top=paste("", plate))
+}
+```
+
 
 
 The heatmaps show that the signal intensities are generally high
@@ -341,6 +378,36 @@ Stepsummary<-cbind(Stepsummary,Step1)
 print(Stepsummary)
 ```
 
+
+##Whole Genome Amplified Samples
+As you can see from the plot above there is a group of highly unmethylated samples, whcih we suspected to be whole genome amplified, these will be excluded from the study as they will heavily influence normalisation.
+
+```{r, echo = FALSE}
+
+WGA_Samples<-which(M.median > 3000 | U.median < 4000)
+```
+
+```{r WGA Scatter, echo=FALSE}
+WGA<-rep("TRUE", nrow(SampleSheet))
+WGA[WGA_Samples] <-"FALSE"
+
+plotfactor<-as.factor(WGA)
+
+plot(M.median, U.median, pch = 16, xlab = "Median M intensity", ylab = "Median U intensity", main= "Whole Genome Amplfied Cluster", col=rainbow(2)[factor(plotfactor)])
+abline(v = 3000, col = "red")
+abline(h = 4000, col = "red")
+legend("topleft", levels(factor(plotfactor)), pch = 16, col = rainbow(2))
+```
+```{r update WGA, include=FALSE}
+SamplesFail[which(WGA=="TRUE")]<-TRUE
+QCmetrics<-cbind(QCmetrics, WGA)
+WGA_Fails<-c(sum(WGA=="TRUE"),sum(SamplesFail))
+Stepsummary<-cbind(Stepsummary,WGA_Fails)
+```
+
+```{r WGA test}
+print(Stepsummary)
+```
 ##Bisulphite Conversion
 A bisulphite conversion statistic for each sample was calculated, and a histogram of the results plotted.
 
@@ -374,51 +441,34 @@ The principal components are calculated, and the two which correlate most with s
 
 
 
-```{r sex check, echo = FALSE, message = FALSE}
-QCmetrics <- QCmetrics[order(rownames(QCmetrics)),]
-RGset2 <- RGset[,order(colnames(RGset))]
-
-identical(rownames(QCmetrics), colnames(RGset))
-
+```{r sex check minfi, warning = FALSE, echo = FALSE, message= FALSE}
 GRset <- mapToGenome(RGset)
 
-intensPASS <- M.median > 800
 
-# QCmetrics<-cbind(QCmetrics,intensPASS)
+predictedSex1 <- getSex(GRset, cutoff = -2)
 
+Sexplot_data <- as.data.frame(predictedSex1)
+Sexplot_data <- Sexplot_data[order(row.names(Sexplot_data)),]
+PredictedSex <-Sexplot_data$predictedSex
+QCmetrics <- cbind(QCmetrics,PredictedSex)
 
-## check sex
-# idenitfy X chromosome probes
-if(!"PredictedSex" %in% colnames(QCmetrics)){	
-	x.probes <- which(seqnames(GRset) == "chrX")
-  y.probes <- which(seqnames(GRset) == "chrY")
-	ints.auto<-getMeth(GRset)[c(x.probes, y.probes),]+getUnmeth(GRset)[c(x.probes, y.probes),]
-	ints.X<-getMeth(GRset)[x.probes,]+getUnmeth(GRset)[x.probes,]
-	ints.Y<-getMeth(GRset)[y.probes,]+getUnmeth(GRset)[y.probes,]
-	x.cp<-colMeans(ints.X, na.rm = TRUE)/colMeans(ints.auto, na.rm = TRUE)
-	y.cp<-colMeans(ints.Y, na.rm = TRUE)/colMeans(ints.auto, na.rm = TRUE)
-	## base prediction on y chromosome
-	predSex.y<-rep(NA, length(y.cp))
-	predSex.y[which(y.cp > 1 & intensPASS == TRUE)]<-"M"
-	predSex.y[which(y.cp < 1 & intensPASS == TRUE)]<-"F"
-	## base prediction on x chromosome
-	predSex.x<-rep(NA, length(x.cp))
-	predSex.x[which(x.cp < 1 & intensPASS == TRUE)]<-"M"
-	predSex.x[which(x.cp > 1 & intensPASS == TRUE)]<-"F"
-	## check for consistent prediction
-	PredictedSex<-rep(NA, length(x.cp))
-	PredictedSex[which(predSex.x == predSex.y)]<-predSex.x[which(predSex.x == predSex.y)]
-	QCmetricsSex<-cbind(QCmetrics,x.cp,y.cp,predSex.x, predSex.y, PredictedSex)
-}
+#here we add the reported sex data
+Sexplot_data <- cbind(Sexplot_data, QCmetrics$Sex)
+colnames(Sexplot_data)[colnames(Sexplot_data)=="QCmetrics$Sex"] <- "Reported Sex"
+#replace blanks with NA
+Sexplot_data$`Reported Sex`[Sexplot_data$`Reported Sex` == ""] <- "NA"
 
-plot(QCmetricsSex$x.cp, QCmetricsSex$y.cp, col = factor(QCmetricsSex$Sex), xlab = "X chromosome", ylab = "Y chromosome", pch = 16)
-abline(v = 1)
-abline(h = 1, pch = 16)
+ggplot(Sexplot_data, aes(Sexplot_data$xMed,Sexplot_data$yMed,
+                                    colour = Sexplot_data$`Reported Sex`)) +
+                  geom_point() +
+                  labs(x= "X Chr, median total intensity (log2)",
+                       y ="Y Chr, median total intensity (log2)",
+                       colour = "Reported Sex")
+
 ```
 
-
 ```{r updateQCmetrics3, include=FALSE}
-QCmetrics<-cbind(QCmetrics, PredictedSex)
+
 ReportedSex <- as.character(QCmetrics$Sex)
 QCmetrics$MismatchSex<-PredictedSex!=ReportedSex
 SamplesFail[which(PredictedSex!=ReportedSex)]<-TRUE
@@ -554,32 +604,10 @@ if(exists('geno')){
 
 }
 
-## if any incongruent perform search for best
-## filter so only one observation of each indivudal in geno data
-genoToSearch<-match(unique(QCmetrics$Sample_ID),QCmetrics$Sample_ID)
-genoMatch<-rep(NA, nrow(QCmetrics))
-genoMatchVal<-rep(NA, nrow(QCmetrics))
-for(i in 1:ncol(meth.sub)){
-  if(intensPASS[i] == TRUE){
-    corVals<-rep(NA, nrow(geno))
-    for(j in genoToSearch){
-      if(!is.na(geno[j,1])){
-        corVals[j]<-cor(as.numeric(geno[j,]), meth.sub[,i], use = "pairwise.complete.obs")
-      }
-    }
-    if(max(corVals, na.rm = TRUE) > 0.8){ ## NB threshold to say 
-      genoMatch[i]<-as.character(QCmetrics$Sample_ID)[which(corVals > 0.8)]
-      genoMatchVal[i]<-max(corVals, na.rm = TRUE)
-    }
-  }
-}
-
-QCmetrics<-cbind(QCmetrics,genoMatchVal, genoMatch)
   #plot histogram of correlations
   hist(GenoCor)
 
 ```
-
 
 A failed sample is where the methyaltion and genotype correlation is low for a SNP, an example is provided here below.
 
@@ -789,12 +817,22 @@ SmokingScore<-smokingscore(betas)
 hist(SmokingScore, main="Histogram of Calculated Smoking Scores")
 QCmetrics<-cbind(QCmetrics, SmokingScore)
 
-
 ```
 
+For the relatively young age of these samples they have high smoking scores, however the smoking score is known to over predict the score in slavia/ bucccal samples 
 
-Smoking scores are added to the QC output and could be used as a covariate in later analyses if required or compared to samples reported smoking behaviours if provided.
+##Tissue Prediction
 
+```{r Tissue Prediction, echo =FALSE, message=FALSE, results= 'hide'}
+#load function 
+source("/mnt/data1/Array_Projects/Tissue_Predictor/Tissue_predictor_function.R")
+
+QCmetrics <- tissue_predictor(QCmetrics, msetEPIC)
+ggplot(data = QCmetrics, aes(x=Organ, fill= Predicted_Tissue))+
+  geom_bar( position= position_dodge())+
+  labs(x = "Reported Tissue", fill= "Predicted Tissue")
+  theme_minimal()
+```
 
 ##Pfilter
 The pfilter function in the wateRmelon package filters data sets based on beadcounts and detection p-values.
@@ -958,6 +996,7 @@ DNA methylation varies between different cell types, and so the composition of c
 If your tissue is not blood, there is currently no appropriate algorithm to calculate you cell propotions for your tissue of interest. Therefore, this part of the report  will not be run and we will move along to the next part of the report. 
 
 ```{r cellcomposition, echo=FALSE, warning= FALSE, message = FALSE}
+setwd(params$PathToProjectFolder)
 if(SampleSheet$Organ == "Blood"){
   if(file.exists(file=  "Cellcounts.rdat")){
     print("Cell Counts exists and merge data together")
@@ -1020,7 +1059,9 @@ betas<-betas[-grep("rs", rownames(betas)),]
 
 #only keeping the useful variables in SampleSheet
 SampleSheet<-QCmetrics[!SamplesFail,]
-SampleSheet<-subset(SampleSheet, select=-c(Control,PredictedSex,pFilterPass,outliers$outliers,GenoCor,Intensity,maxunrelatedcors))
+
+SampleSheet <- SampleSheet[,c("Basename","Family_ID","Twin_Status","Individual_ID","Sample_ID","Study_Name","Institute","Plate","Plate_Location","Sex","Age","Ethnicity","Organ","Tissue_Type","Cell_Type","Time_Point","DNA_IID","DNA_FID","Phenotype", "SentrixID","Position","M.median","U.median","ratio","WGA","GenoCor","maxunrelatedcors", "SmokingScore","Predicted_Tissue","Mismatch_Tissue")]
+
 
 betas<-betas[,match(SampleSheet$Basename, colnames(betas))]
 
@@ -1039,10 +1080,4 @@ if(print(identical(rownames(SampleSheet), colnames(betas)))==TRUE){
 ```
 
 The final dataset contains `r nrow(SampleSheet)` samples and `r nrow(betas)` probes.
-
-When including this stage in your methods the lab protocal that was undertaken is as follows
-
-500ng of DNA from each sample was treated with sodium bisulfite, using the EZ-96 DNAm-Gold kit (Zymo Research, CA, USA). DNAm was quantified using the Illumina Infinium HumanMethylationEPIC BeadChip (Illumina Inc, CA, USA) run on an Illumina iScan System (Illumina, CA, USA) using the manufacturers’ standard protocol.
-
-
 
