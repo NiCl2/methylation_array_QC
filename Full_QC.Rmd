@@ -378,36 +378,6 @@ Stepsummary<-cbind(Stepsummary,Step1)
 print(Stepsummary)
 ```
 
-
-##Whole Genome Amplified Samples
-As you can see from the plot above there is a group of highly unmethylated samples, whcih we suspected to be whole genome amplified, these will be excluded from the study as they will heavily influence normalisation.
-
-```{r, echo = FALSE}
-
-WGA_Samples<-which(M.median > 3000 | U.median < 4000)
-```
-
-```{r WGA Scatter, echo=FALSE}
-WGA<-rep("TRUE", nrow(SampleSheet))
-WGA[WGA_Samples] <-"FALSE"
-
-plotfactor<-as.factor(WGA)
-
-plot(M.median, U.median, pch = 16, xlab = "Median M intensity", ylab = "Median U intensity", main= "Whole Genome Amplfied Cluster", col=rainbow(2)[factor(plotfactor)])
-abline(v = 3000, col = "red")
-abline(h = 4000, col = "red")
-legend("topleft", levels(factor(plotfactor)), pch = 16, col = rainbow(2))
-```
-```{r update WGA, include=FALSE}
-SamplesFail[which(WGA=="TRUE")]<-TRUE
-QCmetrics<-cbind(QCmetrics, WGA)
-WGA_Fails<-c(sum(WGA=="TRUE"),sum(SamplesFail))
-Stepsummary<-cbind(Stepsummary,WGA_Fails)
-```
-
-```{r WGA test}
-print(Stepsummary)
-```
 ##Bisulphite Conversion
 A bisulphite conversion statistic for each sample was calculated, and a histogram of the results plotted.
 
