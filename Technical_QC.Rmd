@@ -240,19 +240,19 @@ for(plate in plates){
   plot1 <- plateHeatmap +
     ggtitle("Median Methylated Intensity") +
     geom_tile(aes(fill=M.median), colour = "white") +
-    geom_point(data=control, aes(x=control$Position, y=control$SentrixID)) +
+    geom_point(data=control, aes(x=Position, y=SentrixID)) +
     theme(legend.position = "none")
   
   plot2 <- plateHeatmap +
     ggtitle("Median Unmethylated Intensity") +
     geom_tile(aes(fill=U.median), colour = "white") +
-    geom_point(data=control, aes(x=control$Position, y=control$SentrixID)) +
+    geom_point(data=control, aes(x=Position, y=SentrixID)) +
     theme(legend.position = "none")
   
   legendplot<-plateHeatmap + 
     geom_tile(aes(fill=U.median), colour = "white") +
     labs(fill="Intensity", alpha="Control") +
-    geom_point(data=control, aes(x=control$Position, y=control$SentrixID, alpha=control$Control)) +
+    geom_point(data=control, aes(x=Position, y=SentrixID, alpha=Control)) +
     scale_alpha_manual(values=c(1,1,1)) + 
     guides(alpha = guide_legend(override.aes = list(colour="black", pch=16)))
     
@@ -278,13 +278,13 @@ for(plate in plates){
     plot3 <- plateHeatmap +
     ggtitle("Ratio of median methylated and median unmethylated Intensity") +
     geom_tile(aes(fill=ratio), colour = "white") +
-    geom_point(data=control, aes(x=control$Position, y=control$SentrixID)) +
+    geom_point(data=control, aes(x=Position, y=SentrixID)) +
     theme(legend.position = "none")
 
   legendplot<-plateHeatmap + 
     geom_tile(aes(fill=U.median), colour = "white") +
     labs(fill="Intensity", alpha="Control") +
-    geom_point(data=control, aes(x=control$Position, y=control$SentrixID, alpha=control$Control)) +
+    geom_point(data=control, aes(x=Position, y=SentrixID, alpha=Control)) +
     scale_alpha_manual(values=c(1,1,1)) + 
     guides(alpha = guide_legend(override.aes = list(colour="black", pch=16)))
     
@@ -507,7 +507,6 @@ QCmetrics <- tissue_predictor(QCmetrics, msetEPIC)
 ggplot(data = QCmetrics, aes(x=Organ, fill= Predicted_Tissue))+
   geom_bar( position= position_dodge())+
   labs(x = "Reported Tissue", fill= "Predicted Tissue")
-  theme_minimal() 
 
 ```
 
